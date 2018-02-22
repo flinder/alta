@@ -30,7 +30,9 @@ from sklearn.svm import LinearSVC
 from sklearn.feature_selection import SelectFromModel
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--random", help="Random sampling", type=bool)
+parser.add_argument("--random", help="Random sampling.", dest='random', action='store_true')
+parser.add_argument("--pweight", help="Inverse probability weighted hyperplane sampling.", dest='pweight', action='store_true')
+
 args = parser.parse_args()
 
 class ItemSelector(BaseEstimator, TransformerMixin):
@@ -118,6 +120,7 @@ for label in labels:
 	current_ids = list(class_ids[label])
 	random_ids += random.sample(current_ids, 20)
 labeled_ids.update(random_ids)
+print(len(labeled_ids))
 
 ## Update inverse probability weights for classes
 def get_weight_dict(labeled_ids):
@@ -164,17 +167,21 @@ runs = []
 for i in range(100):
 	print("Batch %d" % (i+1,))
 	to_code = []
-	if labeled_ids is None:
-		print("NONE")
-	if not args.random:
-		weight_dict = get_weight_dict(labeled_ids)
+
+	if args.random == False:
+		if args.pweight == True:
+			weight_dict = get_weight_dict(labeled_ids)
+		else:
+			p = float(1)/len(labels)
+			weight_dict = {l : p for l in labels} 
+
+	labeled = train.ix[list(labeled_ids), :]
+
+	unlabeled_ids = set(train.index) - set(labeled_ids)
+	unlabeled = data.ix[list(unlabeled_ids), :]
+
 	for label in labels:
-
-		labeled = train.ix[list(labeled_ids), :]
 		y_true = labeled[label]
-
-		unlabeled_ids = set(train.index) - set(labeled_ids)
-		unlabeled = data.ix[list(unlabeled_ids), :]
 		y_unlabeled_true = unlabeled[label]
 
 		vectorizer = TfidfVectorizer(use_idf=True, norm='l2', binary=False, sublinear_tf=True, min_df=0.0001, max_df=0.95, ngram_range=(1, 2))
@@ -196,21 +203,32 @@ for i in range(100):
 		run = {'label' : label, 'f1' : f1, 'support' : support, 'batch' : i}
 		runs.append(run)
 
-		if not args.random:
-			n = int(round(BATCH_SIZE*weight_dict[label]))
-			
-			dist_to_hp = abs(grid.decision_function(X_pred))
+		if args.random == False:
+			try:
+				n = int(round(BATCH_SIZE*weight_dict[label]))
 
-			dist_uc = list(zip(unlabeled_ids, dist_to_hp))
-			dist_uc = sorted(dist_uc, key=lambda x: x[1])
-			
-			sorted_ids = list(zip(*dist_uc))[0]
-			to_code.extend(sorted_ids[:n])
-	if args.random:
-		labeled_ids.update(random.sample(unlabeled_ids, BATCH_SIZE))
-	else:
-		## Add hyperplane-sampled values to labeled ids
-		labeled_ids.update(to_code)
+				dist_to_hp = grid.decision_function(X_pred)
+
+				dist_uc = list(zip(unlabeled_ids, dist_to_hp))
+				dist_uc_pos = [d for d in dist_uc if d[1] >= 0]
+				dist_uc_neg = [d for d in dist_uc if d[1] <= 0]
+
+				pos_ids, _ = list(zip(*sorted(dist_uc_pos, key=lambda x: x[1])))
+				neg_ids, _ = list(zip(*sorted(dist_uc_neg, key=lambda x: x[1])))
+				
+				to_code.extend(pos_ids[:int(n/2)])
+				to_code.extend(neg_ids[:int(n/2)])
+			except IndexError:
+				print("INDEX ERROR: Not enough observations on each side of hyperplane.")
+				dist_to_hp = abs(grid.decision_function(X_pred))
+				dist_uc = list(zip(unlabeled_ids, dist_to_hp))
+				dist_uc = sorted(dist_uc, key=lambda x: x[1])
+				sorted_ids = list(zip(*dist_uc))[0]
+				to_code.extend(sorted_ids[:n])
+
+	if args.random == True:
+		to_code = random.sample(unlabeled_ids, BATCH_SIZE)
+	labeled_ids.update(to_code)
 
 ## Save runs from list of dictionaries to CSV
 simulation_data = pd.DataFrame(runs)
