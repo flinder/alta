@@ -1,3 +1,4 @@
+import argparse
 import itertools
 import pandas as pd
 import numpy as np
@@ -27,6 +28,10 @@ from sklearn.pipeline import FeatureUnion, Pipeline
 from sklearn.grid_search import RandomizedSearchCV
 from sklearn.svm import LinearSVC
 from sklearn.feature_selection import SelectFromModel
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--random", help="Random sampling", type=bool)
+args = parser.parse_args()
 
 class ItemSelector(BaseEstimator, TransformerMixin):
 
@@ -159,7 +164,10 @@ runs = []
 for i in range(100):
 	print("Batch %d" % (i+1,))
 	to_code = []
-	weight_dict = get_weight_dict(labeled_ids)
+	if labeled_ids is None:
+		print("NONE")
+	if not args.random:
+		weight_dict = get_weight_dict(labeled_ids)
 	for label in labels:
 
 		labeled = train.ix[list(labeled_ids), :]
@@ -188,17 +196,25 @@ for i in range(100):
 		run = {'label' : label, 'f1' : f1, 'support' : support, 'batch' : i}
 		runs.append(run)
 
-		dist_to_hp = abs(grid.decision_function(X_pred))
+		if not args.random:
+			n = int(round(BATCH_SIZE*weight_dict[label]))
+			
+			dist_to_hp = abs(grid.decision_function(X_pred))
 
-		dist_uc = list(zip(unlabeled_ids, dist_to_hp))
-		n = int(round(BATCH_SIZE*weight_dict[label]))
-		
-		dist_uc_pos = sorted(dist_uc, key=lambda x: x[1])
-		to_code.extend(list(zip(*dist_uc_pos))[0][:n])
-
-	## Add hyperplane-sampled values to labeled ids
-	labeled_ids = labeled_ids.update(to_code)
+			dist_uc = list(zip(unlabeled_ids, dist_to_hp))
+			dist_uc = sorted(dist_uc, key=lambda x: x[1])
+			
+			sorted_ids = list(zip(*dist_uc))[0]
+			to_code.extend(sorted_ids[:n])
+	if args.random:
+		labeled_ids.update(random.sample(unlabeled_ids, BATCH_SIZE))
+	else:
+		## Add hyperplane-sampled values to labeled ids
+		labeled_ids.update(to_code)
 
 ## Save runs from list of dictionaries to CSV
-active_simulation_data = pd.DataFrame(runs)
-active_simulation_data.to_csv('active_simulation_data.csv', index=False)
+simulation_data = pd.DataFrame(runs)
+if args.random:
+	simulation_data.to_csv('random_simulation_data.csv', index=False)
+else:
+	simulation_data.to_csv('active_simulation_data.csv', index=False)
