@@ -87,19 +87,19 @@ def lemma(text):
 			lemmas.append(lemmatizer.lemmatize(w,p))
 	return ' '.join(lemmas)
 
-data = pd.read_csv('wikipedia_hate_speech.csv')
+data = pd.read_csv('../data/wikipedia_hate_speech.csv')
 if 'token' not in data.columns:
 	with Pool(8) as p:
 		data['token'] = p.map(token, data['comment_text'])
-	data.to_csv('wikipedia_hate_speech.csv', index=False)
+	data.to_csv('../data/wikipedia_hate_speech.csv', index=False)
 if 'stem' not in data.columns:
 	with Pool(8) as p:
 		data['stem'] = p.map(stem, data['comment_text'])
-	data.to_csv('wikipedia_hate_speech.csv', index=False)
+	data.to_csv('../data/wikipedia_hate_speech.csv', index=False)
 if 'lemma' not in data.columns:
 	with Pool(8) as p:
 		data['lemma'] = p.map(lemma, data['comment_text'])
-	data.to_csv('wikipedia_hate_speech.csv', index=False)
+	data.to_csv('../data/wikipedia_hate_speech.csv', index=False)
 
 #############################################################################
 # INITIAL SAMPLING / DEV SET
@@ -233,6 +233,6 @@ for i in range(100):
 ## Save runs from list of dictionaries to CSV
 simulation_data = pd.DataFrame(runs)
 if args.random:
-	simulation_data.to_csv('random_simulation_data.csv', index=False)
+	simulation_data.to_csv('../data/random_simulation_data.csv', index=False)
 else:
-	simulation_data.to_csv('active_simulation_data.csv', index=False)
+	simulation_data.to_csv('../data/active_simulation_data.csv', index=False)
