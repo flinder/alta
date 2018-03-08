@@ -1,4 +1,5 @@
 import pickle
+import os
 
 from sklearn.base import BaseEstimator, TransformerMixin
 
@@ -16,9 +17,9 @@ class DtmSelector(BaseEstimator, TransformerMixin):
 
     '''
 
-    def __init__(self, fname, data_path = '../data/dtms/'):
-            self.data_path = data_path
-            self.fname = f'../data/dtms/{fname}'
+    def __init__(self, feature_set, data_path = '../data/dtms/'):
+            fname = '_'.join([str(x) for x in feature_set]) + '_dtm.pkl'
+            self.fname = os.path.join(data_path, fname)
 
     def fit(self, x, y=None):
             return self
