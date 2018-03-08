@@ -6,6 +6,7 @@ import yaml
 import itertools
 import pandas as pd
 import os
+import pickle
 
 from text_processing import TextProcessor
 
@@ -38,10 +39,11 @@ if __name__ == "__main__":
         
         dtms = []
         for feature_set in feature_sets:
+            outfname = '_'.join([str(x) for x in feature_set]) + '_dtm.pkl'
+            outpath = os.path.join(DATA_PATH, 'dtms/', outfname)
             if data_set['language'] == 'en':
                 out = english_text_processor.vectorize(text, *feature_set)
             else:
                 out = german_text_processor.vectorize(text, *feature_set)
-            #dtms.append(out)
-            print(feature_set)
-            print(out.shape)
+            with open(outpath, 'wb') as outfile:
+                pickle.dump(out, outfile)
