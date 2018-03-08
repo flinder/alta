@@ -9,7 +9,7 @@ class DtmSelector(BaseEstimator, TransformerMixin):
     Selector class to load dtm with specific feature set.
 
     Args:
-    fname: Name of binary file containing feature matrix
+    feature_set: List of features (see 'config.yaml' for details)
     data_path: location of dtms
 
     Returns:
