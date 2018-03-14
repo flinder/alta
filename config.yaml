@@ -1,0 +1,14 @@
+data_sets: 
+    tweets: 
+        fname: 'annotated_german_refugee_tweets.csv'
+        text_col: 'text'
+        language: 'de'
+text_features:
+    tfidf: [on, off]
+    stem: [on, off]
+    token_type: 
+        - ['word', 1] 
+        - ['word', 2]
+        - ['char_wb', 3]
+        - ['char_wb', 4]
+        - ['char_wb', 5]
