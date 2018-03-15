@@ -3,6 +3,10 @@ data_sets:
         fname: 'annotated_german_refugee_tweets.csv'
         text_col: 'text'
         language: 'de'
+    wikipeida_hate_speech:
+        fname: 'wikipedia_hate_speech.csv'
+        text_col: 'comment_text'
+        language: 'en'
 text_features:
     tfidf: [on, off]
     stem: [on, off]
