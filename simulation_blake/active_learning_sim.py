@@ -32,6 +32,8 @@ from sklearn.feature_selection import SelectFromModel
 parser = argparse.ArgumentParser()
 parser.add_argument("--random", help="Random sampling.", dest='random', action='store_true')
 parser.add_argument("--pweight", help="Inverse probability weighted hyperplane sampling.", dest='pweight', action='store_true')
+## sparsity
+## dataset
 
 args = parser.parse_args()
 
@@ -165,7 +167,7 @@ pipeline = Pipeline([
 
 runs = []
 for i in range(100):
-	print("Batch %d" % (i+1,))
+	print("\nBatch %d" % (i+1,))
 	to_code = []
 
 	if args.random == False:

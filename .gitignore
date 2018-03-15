@@ -1,9 +1,7 @@
 data/
 __pycache__/
-<<<<<<< HEAD
 presentation/
-=======
 *.csv
 data
 *.swp
->>>>>>> 55494cabf268cf4e58180e58ff552e3ba84f74d8
+*.DS_Store
