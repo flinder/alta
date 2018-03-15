@@ -35,7 +35,7 @@ ggplot(pdat, aes(x = batch, y = support, color = group)) +
 
 # Learning rate by support
 ggplot(pdat, aes(x = support, y = f1, color = group)) +
-    facet_wrap(~label) +
+    facet_wrap(~label, scales = 'free') +
     geom_line() +
     scale_color_manual(values = pe$colors, name = '') +
     pe$theme    
