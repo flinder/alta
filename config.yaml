@@ -5,7 +5,9 @@ data_sets:
         label_cols: 
             - 'annotation'
         language: 'de'
-    wikipeida_hate_speech:
+        n_records: 24420
+        y_col: 'annotation'
+    wikipedia_hate_speech:
         fname: 'wikipedia_hate_speech.csv'
         text_col: 'comment_text'
         label_cols: 
@@ -16,6 +18,8 @@ data_sets:
             - 'insult'
             - 'identity_hate'
         language: 'en'
+        n_records: 159571
+        y_col: 'toxic'
 text_features:
     tfidf: [on, off]
     stem: [on, off]

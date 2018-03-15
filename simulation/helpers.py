@@ -17,13 +17,13 @@ class DtmSelector(BaseEstimator, TransformerMixin):
 
     '''
 
-    def __init__(self, feature_set, data_path = '../data/dtms/'):
-            fname = '_'.join([str(x) for x in feature_set]) + '_dtm.pkl'
-            self.fname = os.path.join(data_path, fname)
+    def __init__(self, fname="../data/dtms/True_True_['word', 1]_dtm.pkl"):
+            self.fname = fname
 
     def fit(self, x, y=None):
             return self
 
-    def transform(self, data_dict):
+    def transform(self, indexes):
         with open(self.fname, 'rb') as infile:
-            return pickle.load(infile)
+            dtm = pickle.load(infile)
+        return(dtm[indexes, :] )
