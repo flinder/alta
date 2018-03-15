@@ -78,7 +78,7 @@ parameters = {
 ## Model pipeline
 pipeline = Pipeline([
 		('text', Pipeline([
-			('selector', DtmSelector()),
+			('selector', DtmSelector(fname=text_feature_sets[0])),
 			('tfidf', TfidfTransformer())
 		])),
 		('clf', svm),
@@ -100,6 +100,7 @@ labeled_ids.update(init_pos)
 labeled_ids.update(init_neg)
 
 for i in range(200):
+	print(i)
 	to_code = []
 
 	labeled = data.ix[list(labeled_ids), :]
@@ -151,7 +152,7 @@ for i in range(200):
 			dist_uc = list(zip(unlabeled_ids, dist_to_hp))
 			dist_uc = sorted(dist_uc, key=lambda x: x[1])
 			sorted_ids = list(zip(*dist_uc))[0]
-			to_code.extend(sorted_ids[:n])
+			to_code.extend(sorted_ids[:stepsize])
 	else:
 		to_code = random.sample(unlabeled_ids, stepsize)
 	labeled_ids.update(to_code)
