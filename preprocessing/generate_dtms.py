@@ -31,10 +31,15 @@ if __name__ == "__main__":
     english_text_processor = TextProcessor('en')
     
     for data_set_name in config['data_sets']:
-
+        print(f'Processing {data_set_name}')
         data_set = config['data_sets'][data_set_name]
-        #df = pd.read_csv(os.path.join(DATA_PATH, data_set['fname']))
-        df = pd.read_csv('../data/sample.csv')
+        df = pd.read_csv(os.path.join(DATA_PATH, data_set['fname']))
+        s = df.shape[0]
+        df.dropna(inplace=True)
+        n_dropped = s - df.shape[0]
+        if n_dropped > 0:
+            print(f'Dropped {n_dropped} rows due to missing values')
+        #df = pd.read_csv('../data/sample.csv')
         text = df[data_set['text_col']]
         
         dtms = []
