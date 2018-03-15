@@ -43,7 +43,8 @@ if __name__ == "__main__":
         text = df[data_set['text_col']]
         
         dtms = []
-        for feature_set in feature_sets:
+        for i, feature_set in enumerate(feature_sets):
+            print(f'Processing feature set {i}: {feature_set}')
             feature_string = '_'.join([str(x) for x in feature_set])
             outfname = f'{data_set_name}_{feature_string}_dtm.pkl'
             outpath = os.path.join(DATA_PATH, 'dtms/', outfname)

@@ -6,7 +6,7 @@ from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 class TextProcessor(object):
 
     def __init__(self, language='en'):
-        self.parser = spacy.load(language)
+        self.parser = spacy.load(language, disable=['parser', 'tagger', 'ner'])
         self.stemmer = Stemmer.Stemmer(language)
 
     def _lemmatize(self, text):
@@ -33,17 +33,31 @@ class TextProcessor(object):
 
         return vectorizer.fit_transform(texts)
 
-
 if __name__ == "__main__":
     '''
     Test
     '''
 
-    text = pd.Series(["hello I'm text one. with some stuff \n in here",
-                      ('text 2 here. testing the stemming. testing the '
-                      'lemmatization. I dove into the pool. The dove jumped into'
-                      ' the pool 999 times.')])
-
     text_processor = TextProcessor('en')
+    
+    s = time()
+    for i in range(100):
+        output = text_processor.vectorize(text, tfidf=False, stem=False,
+                token_type_gram_size=['word', 1])
+    print(time() - s) 
+    s = time()
+    for i in range(100):
+        output = text_processor.just_vectorize(text)
+    print(time() - s) 
 
-    output = text_processor.vectorize(text)
+
+    nlp = spacy.load('en', disable=['tagger', 'parser', 'ner'])
+    doc = nlp("hello this is a short text to test spacy")
+    for e in doc:
+    
+
+    s = time()
+    for i in range(100):
+        doc = nlp("hello this is a short text to test spacy")
+    print(time() - s)
+
