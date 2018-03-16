@@ -10,6 +10,11 @@ import yaml
 from scipy.stats import expon, beta
 
 from collections import Counter
+from functools import reduce
+from operator import or_
+
+def merge(*dicts):
+    return { k: reduce(lambda d, x: x.get(k, d), dicts, None) for k in reduce(or_, map(lambda x: x.keys(), dicts), set()) }
 
 ## Suppress sklearn warnings
 def warn(*args, **kwargs):
@@ -42,7 +47,7 @@ CONFIG = '../config.yaml'
 with open(CONFIG) as config_file:
 	config = yaml.load(config_file)
 
-text_feature_sets = list(itertools.product(*config['text_features'].values()))
+text_feature_sets = list(itertools.product(config["text_features"]["tfidf"], config["text_features"]["stem"], config["text_features"]["token_type"]))
 text_feature_sets = ['../data/dtms/' + '_'.join([args.data]+[str(x) for x in tf]) + '_dtm.pkl' for tf in text_feature_sets]
 
 #############################################################################
@@ -215,8 +220,9 @@ for i in range(n_steps):
 	X_pred = np.array(unlabeled_ids)
 	X_dev = np.array(test)
 
+	n_jobs = config['data_sets'][args.data]['n_jobs']
 	## Randomized hyperparameter search
-	grid = RandomizedSearchCV(pipeline, parameters, n_iter=20, scoring=make_scorer(f1_score), n_jobs=2, random_state=1988)
+	grid = RandomizedSearchCV(pipeline, parameters, n_iter=20, scoring=make_scorer(f1_score), n_jobs=n_jobs, random_state=1988)
 	try:
 		grid.fit(X_train, y_train)
 	except ValueError:
@@ -236,7 +242,7 @@ for i in range(n_steps):
 	support = len([y for y in y_true if y == 1])
 	print("Batch %d/%d - F: %.2f, P: %.2f, R: %.2f, n_pos_pred: %d, pos_sup: %d, sup: %d" % (i+1, n_steps+1, f1, p, r, n_pos, support, (i+1) * stepsize))
 	run = {'f1' : f1, 'p' : p, 'r' : r, 'n_pos_pred' : n_pos, 'support' : support, 'batch' : i}
-	run = {**run, **grid.best_params_}
+	run = merge(run, grid.best_params_)
 	runs.append(run)
 
 	if ((i+1) * stepsize) % 500 == 0:

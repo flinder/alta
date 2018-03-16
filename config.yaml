@@ -7,6 +7,7 @@ data_sets:
         language: 'de'
         n_records: 24420
         y_col: 'annotation'
+        n_jobs: 2
     wikipedia_hate_speech:
         fname: 'wikipedia_hate_speech.csv'
         text_col: 'comment_text'
@@ -20,6 +21,7 @@ data_sets:
         language: 'en'
         n_records: 159571
         y_col: 'toxic'
+        n_jobs: 4
 text_features:
     tfidf: [on, off]
     stem: [on, off]
