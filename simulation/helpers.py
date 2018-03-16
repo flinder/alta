@@ -26,4 +26,8 @@ class DtmSelector(BaseEstimator, TransformerMixin):
     def transform(self, indexes):
         with open(self.fname, 'rb') as infile:
             dtm = pickle.load(infile)
-        return(dtm[indexes, :] )
+        try:
+            return(dtm[indexes, :] )
+        except:
+            print(type(indexes))
+            raise
