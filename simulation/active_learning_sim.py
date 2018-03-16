@@ -11,7 +11,7 @@ from scipy.stats import expon, beta
 
 from collections import Counter
 
-## Suppress sklearn warnings blah
+## Suppress sklearn warnings
 def warn(*args, **kwargs):
 	pass
 import warnings
