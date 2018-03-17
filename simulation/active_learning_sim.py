@@ -143,14 +143,16 @@ def save_runs(runs, idx):
 fname = config['data_sets'][args.data]['fname']
 y_col = config['data_sets'][args.data]['y_col']
 data = pd.read_csv("../data/%s" % fname, dtype={y_col: 'int'})
+
+if config['data_sets'][args.data]['n_cap'] is not None:
+	data = data.sample(config['data_sets'][args.data]['n_cap'])
 if args.balance is not None:
 	all_idxs = balance_data(data, args.balance)
 	print("Class balance: %.2f" % args.balance)
 	n_records = len(all_idxs)
 else:
+	all_idxs = data.index
 	n_records = len(data)
-	all_idxs = range(0, n_records)
-
 
 train, test, train_y, test_y = train_test_split(all_idxs, data.ix[all_idxs, y_col], test_size=0.2, random_state=1988)
 
