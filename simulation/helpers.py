@@ -17,7 +17,7 @@ class DtmSelector(BaseEstimator, TransformerMixin):
 
     '''
 
-    def __init__(self, fname="../data/dtms/True_True_['word', 1]_dtm.pkl"):
+    def __init__(self, fname):
             self.fname = fname
 
     def fit(self, x, y=None):
@@ -26,4 +26,8 @@ class DtmSelector(BaseEstimator, TransformerMixin):
     def transform(self, indexes):
         with open(self.fname, 'rb') as infile:
             dtm = pickle.load(infile)
-        return(dtm[indexes, :] )
+        try:
+            return(dtm[indexes, :] )
+        except:
+            print(type(indexes))
+            raise

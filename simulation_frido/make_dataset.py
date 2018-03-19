@@ -47,4 +47,5 @@ df = df[['annotation', 'text']]
 df.loc[df['annotation'] >= 0.5, 'annotation'] = 1
 df.loc[df['annotation'] < 0.5, 'annotation'] = 0
 
+df.dropna(inplace=True)
 df.to_csv('../data/annotated_german_refugee_tweets.csv')
