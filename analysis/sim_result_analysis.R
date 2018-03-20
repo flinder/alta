@@ -1,6 +1,7 @@
 library(tidyverse)
 #devtools::install_github('flinder/flindR')
 library(flindR)
+library(reshape2)
 
 # ==============================================================================
 # CONFIG
@@ -34,7 +35,6 @@ data = do.call(rbind, lapply(files, proc_file)) %>%
 # ==============================================================================
 # Visualize results
 # ==============================================================================
-
 # F1 score
 ggplot(data, aes(x = batch * BATCH_SIZE, y = f1, color = algo,
                  linetype = algo)) +
@@ -65,7 +65,6 @@ ggsave('../paper/figures/tweets_precision.png', width = pe$p_width,
 ggsave('../presentation/figures/tweets_precision.png', width = pe$p_width, 
        height = 0.7*pe$p_width)
 
-
 # Recall
 ggplot(data, aes(x = batch * BATCH_SIZE, y = recall, color = algo,
                  linetype = algo)) +
@@ -80,3 +79,45 @@ ggsave('../paper/figures/tweets_recall.png', width = pe$p_width,
        height = 0.7*pe$p_width)
 ggsave('../presentation/figures/tweets_recall.png', width = pe$p_width, 
        height = 0.7*pe$p_width)
+
+# ==============================================================================
+# Plots for presentation
+# ==============================================================================
+
+twitter_data = read_csv('../data/annotated_german_refugee_tweets.csv') %>%
+    select(-text) %>%
+    mutate(t_annotation = as.factor(ifelse(annotation == 1, 'relevant', 
+                                         'irrelevant')))
+
+# Demonstrate sparsity of relevant twitter data
+ggplot(twitter_data) +
+    geom_bar(aes(x = t_annotation, fill = t_annotation, color = t_annotation), 
+             alpha = 0.5) + 
+    scale_fill_manual(values = pe$colors, name = "", guide = F) +
+    scale_color_manual(values = pe$colors, name = "", guide = F) +
+    xlab('') + ylab('') +
+    pe$theme
+ggsave('../presentation/figures/twitter_proportion.png', width = pe$p_width,
+       height = 0.7*pe$p_width)
+
+# Demonstrate how many tweets have to be annotated to get X relevant labels
+bs_iter = function(i) {
+    p_pos = mean(sample(twitter_data$annotation, nrow(twitter_data), 
+                        replace = T))
+    return(seq(100, 1000, 10) / p_pos) 
+}
+
+bs_out = sapply(1:1000, bs_iter)
+
+pdat = t(bs_out) %>%
+    melt() %>% tbl_df()
+
+ggplot(pdat) +
+    geom_jitter(aes(x = Var2 * 10 + 100, y = value), size = 1, alpha = 0.01) +
+    xlab("# of positively labeled samples") + 
+    ylab("# of required labeled samples") +
+    scale_y_continuous(labels = scales::comma) +
+    pe$theme
+ggsave('../presentation/figures/required_samples.png')
+
+

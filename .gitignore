@@ -1,6 +1,5 @@
 data/
 __pycache__/
-presentation/
 *.csv
 data
 *.swp
