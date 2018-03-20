@@ -9,6 +9,9 @@ pe = plot_elements()
 DATA_DIR = "../data/runs/tweets/"
 BATCH_SIZE = 20 # Size of AL batches should probably be loaded form config.yaml
 
+plot_theme = pe$theme +
+    theme(strip.text.x = element_text(size = 14))
+
 # ==============================================================================
 # Data prep
 # ==============================================================================
@@ -41,7 +44,7 @@ ggplot(data, aes(x = batch * BATCH_SIZE, y = f1, color = algo,
     scale_color_manual(values = pe$colors[-1], name = 'Labeling\nAlgorithm') +
     scale_linetype(name = 'Labeling\nAlgorithm') +
     ylab('F1 Score') + xlab('# labeled samples') +
-    pe$theme
+    plot_theme
 ggsave('../paper/figures/tweets_f1.png', width = pe$p_width, 
        height = 0.7*pe$p_width)
 ggsave('../presentation/figures/tweets_f1.png', width = pe$p_width, 
@@ -56,7 +59,7 @@ ggplot(data, aes(x = batch * BATCH_SIZE, y = precision, color = algo,
     scale_color_manual(values = pe$colors[-1], name = 'Labeling\nAlgorithm') +
     scale_linetype(name = 'Labeling\nAlgorithm') +
     ylab('Precision') + xlab('# labeled samples') +
-    pe$theme
+    plot_theme
 ggsave('../paper/figures/tweets_precision.png', width = pe$p_width, 
        height = 0.7*pe$p_width)
 ggsave('../presentation/figures/tweets_precision.png', width = pe$p_width, 
@@ -72,7 +75,7 @@ ggplot(data, aes(x = batch * BATCH_SIZE, y = recall, color = algo,
     scale_color_manual(values = pe$colors[-1], name = 'Labeling\nAlgorithm') +
     scale_linetype(name = 'Labeling\nAlgorithm') +
     ylab('Recall') + xlab('# labeled samples') +
-    pe$theme
+    plot_theme
 ggsave('../paper/figures/tweets_recall.png', width = pe$p_width, 
        height = 0.7*pe$p_width)
 ggsave('../presentation/figures/tweets_recall.png', width = pe$p_width, 
