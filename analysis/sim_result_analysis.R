@@ -32,6 +32,11 @@ proc_file = function(filename) {
         mutate(algo = algo, balance = balance, run = run)
 }
 
+
+# ==============================================================================
+# Visualize results
+# ==============================================================================
+
 for(data_set in DATA_SETS) {
     
     cat('Processing ', data_set, '\n')    
@@ -45,10 +50,8 @@ for(data_set in DATA_SETS) {
                precision = ifelse(is.na(p), 0, p),
                recall = ifelse(is.na(r), 0, r),
                balance = paste0("Balance: ", balance))
-    
-    # ==============================================================================
-    # Visualize results
-    # ==============================================================================
+     
+   
     # F1 score
     ggplot(data, aes(x = batch * BATCH_SIZE, y = f1, color = algo,
                      linetype = algo)) +
@@ -93,6 +96,29 @@ for(data_set in DATA_SETS) {
            width = pe$p_width, height = 0.7*pe$p_width)
     ggsave(paste0('../presentation/figures/', data_set, '_recall.png'), 
            width = pe$p_width, height = 0.7*pe$p_width)
+    
+    # Visualize support growth
+    d = filter(data, balance == 'Balance: 0.01') %>%
+        group_by(batch, algo) %>%
+        summarize(mean_f1 = mean(f1_score), mean_support = mean(support))
+    #total_positives = proj_conf$data_sets$tweets$n_positive
+    
+    ggplot(d, aes(x = batch * BATCH_SIZE, y = mean_f1, color = algo,
+                  size = mean_support)) + 
+        geom_point(alpha = 0.4) + 
+        #geom_line(size = 1) +
+        scale_color_manual(values = pe$colors, name = 'Labeling\nAlgorithm') +
+        scale_linetype(name = 'Labeling\nAlgorithm') +
+        scale_size_continuous(name = 'Mean # of\npositives', range = c(0.5, 4)) +
+        ylab('F1-Score (mean)') + xlab('# labeled samples') +
+        plot_theme
+    ggsave(paste0('../paper/figures/', data_set, 
+                  '_f1_labeled_support_balance_0.01.png'), width = pe$p_width, 
+           height = 0.7*pe$p_width)
+    ggsave(paste0('../presentation/figures/', data_set, 
+                  '_f1_labeled_support_balance_0.01.png'), 
+       width = pe$p_width, height = 0.7*pe$p_width)
+ 
 }
 
 # ==============================================================================
