@@ -53,8 +53,6 @@ if __name__ == "__main__":
 
     nlp = spacy.load('en', disable=['tagger', 'parser', 'ner'])
     doc = nlp("hello this is a short text to test spacy")
-    for e in doc:
-    
 
     s = time()
     for i in range(100):
