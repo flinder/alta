@@ -5,7 +5,6 @@ data_sets:
         label_cols: 
             - 'annotation'
         language: 'de'
-        n_records: 24420
         y_col: 'annotation'
         n_jobs: 4
         n_cap: null
@@ -20,10 +19,18 @@ data_sets:
             - 'insult'
             - 'identity_hate'
         language: 'en'
-        n_records: 159571
         y_col: 'toxic'
         n_jobs: 4
         n_cap: 25000
+    breitbart:
+        fname: 'breitbart_data.csv'
+        text_col: 'text'
+        label_cols: 
+            - 'muslim_identity' 
+        language: 'en'
+        y_col: 'muslim_identity'
+        n_jobs: 4
+        n_cap: null
 text_features:
     tfidf: [on, off]
     stem: [on, off]

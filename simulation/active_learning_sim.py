@@ -34,7 +34,7 @@ from sklearn.svm import LinearSVC
 from helpers import DtmSelector
 
 parser = argparse.ArgumentParser()
-parser.add_argument("data", help="Valid choices are 'tweets' and 'wikipedia_hate_speech'", type=str)
+parser.add_argument("data", help="Valid choices are 'tweets' and 'wikipedia_hate_speech' 'breitbart'", type=str)
 parser.add_argument("--balance", help="Float, proportion of positive observations", type=float)
 parser.add_argument("--random", help="Random sampling.", dest='random', action='store_true')
 
