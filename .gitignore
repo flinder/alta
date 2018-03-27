@@ -5,3 +5,4 @@ presentation/
 data
 *.swp
 *.DS_Store
+*.out
