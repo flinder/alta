@@ -113,10 +113,10 @@ for(data_set in DATA_SETS) {
         ylab('F1-Score (mean)') + xlab('# labeled samples') +
         plot_theme
     ggsave(paste0('../paper/figures/', data_set, 
-                  '_f1_labeled_support_balance_0.01.png'), width = pe$p_width, 
+                  '_f1_labeled_support_balance_001.png'), width = pe$p_width, 
            height = 0.7*pe$p_width)
     ggsave(paste0('../presentation/figures/', data_set, 
-                  '_f1_labeled_support_balance_0.01.png'), 
+                  '_f1_labeled_support_balance_001.png'), 
        width = pe$p_width, height = 0.7*pe$p_width)
  
 }
