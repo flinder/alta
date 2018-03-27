@@ -9,6 +9,7 @@ import os
 import pickle
 
 from text_processing import TextProcessor
+from multiprocessing import Pool
 
 
 if __name__ == "__main__":
@@ -34,18 +35,25 @@ if __name__ == "__main__":
         print(f'Processing {data_set_name}')
         data_set = config['data_sets'][data_set_name]
         df = pd.read_csv(os.path.join(DATA_PATH, data_set['fname']))
+        df = df.loc[df[data_set['text_col']].notnull(), ]
         text = df[data_set['text_col']]
 
+        i_feature_sets = enumerate(feature_sets)
         # Generate the dtm with given features
-        for i, feature_set in enumerate(feature_sets):
 
-            print(f'Processing feature set {i}: {feature_set}')
+        def process_feature_set(i_feature_set):
+            i, feature_set = i_feature_set
             feature_string = '_'.join([str(x) for x in feature_set])
             outfname = f'{data_set_name}_{feature_string}_dtm.pkl'
             outpath = os.path.join(DATA_PATH, 'dtms/', outfname)
-            if data_set['language'] == 'en':
-                out = english_text_processor.vectorize(text, *feature_set)
-            else:
-                out = german_text_processor.vectorize(text, *feature_set)
-            with open(outpath, 'wb') as outfile:
-                pickle.dump(out, outfile)
+            if not os.path.isfile(outpath):
+                print(f'Processing feature set {i}: {feature_set}')
+                if data_set['language'] == 'en':
+                    out = english_text_processor.vectorize(text, *feature_set)
+                else:
+                    out = german_text_processor.vectorize(text, *feature_set)
+                with open(outpath, 'wb') as outfile:
+                    pickle.dump(out, outfile)
+
+        with Pool(1) as p:
+            p.map(process_feature_set, i_feature_sets)
