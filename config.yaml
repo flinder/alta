@@ -1,18 +1,19 @@
-data_sets: 
-    tweets: 
+data_sets:
+    tweets:
         fname: 'annotated_german_refugee_tweets.csv'
         text_col: 'text'
-        label_cols: 
+        label_cols:
             - 'annotation'
         language: 'de'
         y_col: 'annotation'
         n_jobs: 4
         n_cap: null
+        sgd: false
     wikipedia_hate_speech:
         fname: 'wikipedia_hate_speech.csv'
         text_col: 'comment_text'
-        label_cols: 
-            - 'toxic' 
+        label_cols:
+            - 'toxic'
             - 'severe_toxic'
             - 'obscene'
             - 'threat'
@@ -21,21 +22,23 @@ data_sets:
         language: 'en'
         y_col: 'toxic'
         n_jobs: 4
-        n_cap: 25000
+        n_cap: null
+        sgd: false
     breitbart:
         fname: 'breitbart_data.csv'
         text_col: 'text'
-        label_cols: 
-            - 'muslim_identity' 
+        label_cols:
+            - 'muslim_identity'
         language: 'en'
         y_col: 'muslim_identity'
         n_jobs: 4
         n_cap: null
+        sgd: false
 text_features:
     tfidf: [on, off]
     stem: [on, off]
-    token_type: 
-        - ['word', 1] 
+    token_type:
+        - ['word', 1]
         - ['word', 2]
         - ['char_wb', 3]
         - ['char_wb', 4]

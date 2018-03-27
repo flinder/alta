@@ -7,7 +7,7 @@ import os
 import pickle
 import random
 import yaml
-from scipy.stats import expon, beta
+from scipy.stats import expon, beta, rv_continuous
 
 from collections import Counter
 from functools import reduce
@@ -28,7 +28,7 @@ from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.grid_search import RandomizedSearchCV
 from sklearn.svm import LinearSVC
-#from sklearn.linear_model import SGDClassifier
+from sklearn.linear_model import SGDClassifier
 
 # Internal imports
 from helpers import DtmSelector
@@ -164,19 +164,26 @@ print("Negative observations: %d\n" % class_counter[0])
 # MODEL
 #############################################################################
 
-#svm = SGDClassifier(penalty='elasticnet', loss='log', alpha=0.0001, l1_ratio=0.77, random_state=26661)
-svm = LinearSVC(penalty='l2', class_weight='balanced', random_state=64)
+# Transformation to ensure alpha and C are equivalent for SGD/GD
+class alpha(rv_continuous):
+	def _pdf(self, x):
+		val = 1. / (np.random.exponential(50) * (n_records * .8))
+		return val
 
-## Hyperparameter distributions for randomized search
-parameters = {
-	#'clf__class_weight': ['balanced', None],
-	#'clf__alpha': expon(1e-4),
-	#'clf__l1_ratio': beta(4,1),
-	'clf__C': expon(50),
-	'clf__class_weight': ['balanced', None],
-	'clf__tol': expon(1e-4),
-	'text__selector__fname': text_feature_sets,
-}
+if config['data_sets'][args.data]['sgd'] == True:
+	svm = SGDClassifier(loss="hinge", random_state=1988)
+	parameters = {
+		'clf__alpha': alpha(),
+		'clf__class_weight': ['balanced', None],
+		'text__selector__fname': text_feature_sets,
+	}
+else:
+	svm = LinearSVC(penalty='l2', class_weight='balanced', random_state=1988)
+	parameters = {
+		'clf__C': expon(50),
+		'clf__class_weight': ['balanced', None],
+		'text__selector__fname': text_feature_sets,
+	}
 
 ## Model pipeline
 pipeline = Pipeline([
@@ -196,7 +203,7 @@ pipeline = Pipeline([
 
 runs = []
 stepsize = 20
-max_records = n_records // 5
+max_records = min(n_records // 5, 5000)
 n_steps = max_records // stepsize
 if n_steps < 200:
 	n_steps = min(n_records // stepsize, 200)
