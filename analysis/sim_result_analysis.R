@@ -22,6 +22,7 @@ plot_theme = pe$theme +
 # ==============================================================================
 # Data prep
 # ==============================================================================
+
 proc_file = function(filename) {
     comp = unlist(strsplit(filename, '/'))
     run = as.integer(comp[5])
@@ -32,12 +33,12 @@ proc_file = function(filename) {
         mutate(algo = algo, balance = balance, run = run)
 }
 
-
-# ==============================================================================
-# Visualize results
-# ==============================================================================
-
-for(data_set in DATA_SETS) {
+# TODO: If results for different query algorithms come in separate files, this 
+# code has to be adapted to put them all in the same DF. Adjust algo in 
+# proc_file() accordingly
+results = list()
+i = 1
+for(data_set in DATA_SETS[1:2]) {
     
     cat('Processing ', data_set, '\n')    
     
@@ -49,77 +50,89 @@ for(data_set in DATA_SETS) {
         mutate(f1_score = ifelse(is.na(f1), 0, f1),
                precision = ifelse(is.na(p), 0, p),
                recall = ifelse(is.na(r), 0, r),
-               balance = paste0("Balance: ", balance))
-     
-   
-    # F1 score
-    ggplot(data, aes(x = batch * BATCH_SIZE, y = f1, color = algo,
-                     linetype = algo)) +
-        facet_wrap(~balance, scales = 'free') +
-        geom_point(size = 0.1, alpha = 0.1) + 
-        geom_smooth() +
-        scale_color_manual(values = pe$colors, name = 'Labeling\nAlgorithm') +
-        scale_linetype(name = 'Labeling\nAlgorithm') +
-        ylab('F1 Score') + xlab('# labeled samples') +
-        plot_theme
-    ggsave(paste0('../paper/figures/',data_set ,'_f1.png'), width = pe$p_width, 
-           height = 0.7*pe$p_width)
-    ggsave(paste0('../presentation/figures/',data_set, '_f1.png'), 
-           width = pe$p_width, height = 0.7*pe$p_width)
-    
-    # Precision
-    ggplot(data, aes(x = batch * BATCH_SIZE, y = precision, color = algo,
-                     linetype = algo)) +
-        facet_wrap(~balance, scales = 'free') +
-        geom_point(size = 0.1, alpha = 0.1) + 
-        geom_smooth() +
-        scale_color_manual(values = pe$colors, name = 'Labeling\nAlgorithm') +
-        scale_linetype(name = 'Labeling\nAlgorithm') +
-        ylab('Precision') + xlab('# labeled samples') +
-        plot_theme
-    ggsave(paste0('../paper/figures/', data_set, '_precision.png'), 
-           width = pe$p_width, height = 0.7*pe$p_width)
-    ggsave(paste0('../presentation/figures/', data_set, '_precision.png'), 
-           width = pe$p_width, height = 0.7*pe$p_width)
-    
-    # Recall
-    ggplot(data, aes(x = batch * BATCH_SIZE, y = recall, color = algo,
-                     linetype = algo)) +
-        facet_wrap(~balance, scales = 'free') +
-        geom_point(size = 0.1, alpha = 0.1) + 
-        geom_smooth() +
-        scale_color_manual(values = pe$colors, name = 'Labeling\nAlgorithm') +
-        scale_linetype(name = 'Labeling\nAlgorithm') +
-        ylab('Recall') + xlab('# labeled samples') +
-        plot_theme
-    ggsave(paste0('../paper/figures/', data_set, '_recall.png'), 
-           width = pe$p_width, height = 0.7*pe$p_width)
-    ggsave(paste0('../presentation/figures/', data_set, '_recall.png'), 
-           width = pe$p_width, height = 0.7*pe$p_width)
-    
-    # Visualize support growth
-    d = filter(data, balance == 'Balance: 0.01') %>%
-        group_by(batch, algo) %>%
-        summarize(mean_f1 = mean(f1_score), mean_support = mean(support))
-    #total_positives = proj_conf$data_sets$tweets$n_positive
-    
-    ggplot(d, aes(x = batch * BATCH_SIZE, y = mean_f1, color = algo,
-                  size = mean_support)) + 
-        geom_point(alpha = 0.4) + 
-        #geom_line(size = 1) +
-        scale_color_manual(values = pe$colors, name = 'Labeling\nAlgorithm') +
-        scale_linetype(name = 'Labeling\nAlgorithm') +
-        scale_size_continuous(name = 'Mean # of\npositives', range = c(0.5, 4)) +
-        ylab('F1-Score (mean)') + xlab('# labeled samples') +
-        plot_theme
-    ggsave(paste0('../paper/figures/', data_set, 
-                  '_f1_labeled_support_balance_001.png'), width = pe$p_width, 
-           height = 0.7*pe$p_width)
-    ggsave(paste0('../presentation/figures/', data_set, 
-                  '_f1_labeled_support_balance_001.png'), 
+               balance = paste0("Balance: ", balance),
+               data_set = data_set)
+    results[[i]] = data
+    i = i + 1
+}   
+data = do.call(rbind, results)
+data$data_set = recode(data$data_set, 'tweets' = 'Twitter', 
+                      'wikipedia_hate_speech' = 'Wikipedia')
+data = filter(data, balance %in% c("Balance: 0.01", "Balance: 0.10", 
+                                   "Balance: 0.50"))
+n_dset = length(unique(data$data_set))
+
+# ==============================================================================
+# Visualize results
+# ==============================================================================
+
+# F1 score
+#data = filter(data, batch * BATCH_SIZE <= 1000)
+ggplot(data, aes(x = batch * BATCH_SIZE, y = f1, color = algo,
+                 linetype = algo)) +
+    facet_wrap(~balance + data_set, scales = 'fixed', ncol = n_dset) +
+    geom_point(size = 0.05, alpha = 0.05) + 
+    geom_smooth() +
+    scale_color_manual(values = pe$colors, name = 'Labeling\nAlgorithm') +
+    scale_linetype(name = 'Labeling\nAlgorithm') +
+    ylab('F1 Score') + xlab('# labeled samples') +
+    plot_theme
+ggsave('../paper/figures/main_results_f1.png', width = pe$p_width, 
+       height = 0.7*pe$p_width)
+ggsave('../presentation/figures/main_results_f1.png', width = pe$p_width, 
+       height = 0.7*pe$p_width)
+
+# Precision
+ggplot(data, aes(x = batch * BATCH_SIZE, y = precision, color = algo,
+                 linetype = algo)) +
+    facet_wrap(~balance + data_set, scales = 'fixed', ncol = n_dset) +
+    geom_point(size = 0.05, alpha = 0.05) + 
+    geom_smooth() +
+    scale_color_manual(values = pe$colors, name = 'Labeling\nAlgorithm') +
+    scale_linetype(name = 'Labeling\nAlgorithm') +
+    ylab('Precision') + xlab('# labeled samples') +
+    plot_theme
+ggsave('../paper/figures/main_results_precision.png', width = pe$p_width, 
+       height = 0.7*pe$p_width)
+ggsave('../presentation/figures/main_results_precision.png', 
        width = pe$p_width, height = 0.7*pe$p_width)
- 
-}
+
+# Recall
+ggplot(data, aes(x = batch * BATCH_SIZE, y = recall, color = algo,
+                 linetype = algo)) +
+    facet_wrap(~balance + data_set, scales = 'fixed', ncol = n_dset) +
+    geom_point(size = 0.05, alpha = 0.05) + 
+    geom_smooth() +
+    scale_color_manual(values = pe$colors, name = 'Labeling\nAlgorithm') +
+    scale_linetype(name = 'Labeling\nAlgorithm') +
+    ylab('Recall') + xlab('# labeled samples') +
+    plot_theme
+ggsave('../paper/figures/main_results_recall.png', 
+       width = pe$p_width, height = 0.7*pe$p_width)
+ggsave('../presentation/figures/main_results_recall.png', 
+       width = pe$p_width, height = 0.7*pe$p_width)
+
+# Visualize support growth
+d = filter(data, balance == 'Balance: 0.01') %>%
+    group_by(batch, algo, data_set) %>%
+    summarize(mean_f1 = mean(f1_score), mean_support = mean(support))
+#total_positives = proj_conf$data_sets$tweets$n_positive
+
+ggplot(d, aes(x = batch * BATCH_SIZE, y = mean_f1, color = algo,
+              size = mean_support)) + 
+    facet_wrap(~data_set) +
+    geom_point(alpha = 0.4) + 
+    #geom_line(size = 1) +
+    scale_color_manual(values = pe$colors, name = 'Labeling\nAlgorithm') +
+    scale_linetype(name = 'Labeling\nAlgorithm') +
+    scale_size_continuous(name = 'Mean # of\npositives', range = c(0.5, 4)) +
+    ylab('F1-Score (mean)') + xlab('# labeled samples') +
+    plot_theme
+ggsave('../paper/figures/f1_labeled_support_balance_001.png', 
+       width = pe$p_width, height = 0.7*pe$p_width)
+ggsave('../presentation/figures/f1_labeled_support_balance_001.png', 
+   width = pe$p_width, height = 0.7*pe$p_width)
+
 
 # ==============================================================================
 # Pre-pocessing choices
