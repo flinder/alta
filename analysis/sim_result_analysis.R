@@ -139,7 +139,7 @@ d = filter(data, balance == 'Balance: 0.01') %>%
 
 ggplot(d, aes(x = batch * BATCH_SIZE, y = mean_f1, color = algo,
               size = mean_support)) + 
-    facet_wrap(~data_set) +
+    facet_wrap(~data_set, ncol = 1) +
     geom_point(alpha = 0.4) + 
     #geom_line(size = 1) +
     scale_color_manual(values = pe$colors, name = 'Labeling\nAlgorithm') +
