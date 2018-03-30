@@ -18,6 +18,9 @@ DATA_DIR = "../data/runs/"
 pe = plot_elements()
 plot_theme = pe$theme +
     theme(strip.text.x = element_text(size = 14))
+# Height to width ratio for main results figures (f1, prec, rec)
+htwr = 1
+htwr_pres = 0.7
 
 # ==============================================================================
 # Data prep
@@ -65,8 +68,17 @@ data = do.call(rbind, results)
 data$data_set = recode(data$data_set, 'tweets' = 'Twitter', 
                       'wikipedia_hate_speech' = 'Wikipedia',
                       'breitbart' = 'Breitbart')
-data = filter(data, balance %in% c("Balance: 0.01", "Balance: 0.10", 
-                                   "Balance: 0.50"))
+data = filter(data, balance %in% c("Balance: 0.01", "Balance: 0.05", 
+                                   "Balance: 0.10", "Balance: 0.50"))
+# Placeholder for Breitbart 0.05 results:
+ph = data[1, ]
+ph$f1_score = 0
+ph$precision = 0
+ph$recall = 0
+ph$balance = 'Balance: 0.05'
+ph$data_set = 'Breitbart'
+data = rbind(data, ph)
+
 n_dset = length(unique(data$data_set))
 
 # ==============================================================================
@@ -85,9 +97,9 @@ ggplot(data, aes(x = batch * BATCH_SIZE, y = f1, color = algo,
     ylab('F1 Score') + xlab('# labeled samples') +
     plot_theme
 ggsave('../paper/figures/main_results_f1.png', width = pe$p_width, 
-       height = 0.7*pe$p_width)
+       height = htwr*pe$p_width)
 ggsave('../presentation/figures/main_results_f1.png', width = pe$p_width, 
-       height = 0.7*pe$p_width)
+       height = htwr_pres*pe$p_width)
 
 # Precision
 ggplot(data, aes(x = batch * BATCH_SIZE, y = precision, color = algo,
@@ -100,9 +112,9 @@ ggplot(data, aes(x = batch * BATCH_SIZE, y = precision, color = algo,
     ylab('Precision') + xlab('# labeled samples') +
     plot_theme
 ggsave('../paper/figures/main_results_precision.png', width = pe$p_width, 
-       height = 0.7*pe$p_width)
+       height = htwr*pe$p_width)
 ggsave('../presentation/figures/main_results_precision.png', 
-       width = pe$p_width, height = 0.7*pe$p_width)
+       width = pe$p_width, height = htwr_pres*pe$p_width)
 
 # Recall
 ggplot(data, aes(x = batch * BATCH_SIZE, y = recall, color = algo,
@@ -115,9 +127,9 @@ ggplot(data, aes(x = batch * BATCH_SIZE, y = recall, color = algo,
     ylab('Recall') + xlab('# labeled samples') +
     plot_theme
 ggsave('../paper/figures/main_results_recall.png', 
-       width = pe$p_width, height = 0.7*pe$p_width)
+       width = pe$p_width, height = htwr*pe$p_width)
 ggsave('../presentation/figures/main_results_recall.png', 
-       width = pe$p_width, height = 0.7*pe$p_width)
+       width = pe$p_width, height = htwr_pres*pe$p_width)
 
 # Visualize support growth
 d = filter(data, balance == 'Balance: 0.01') %>%
