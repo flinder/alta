@@ -31,6 +31,11 @@ proc_file = function(filename) {
     balance = gsub('\\.csv', '', comp_2[4])
     data = suppressMessages(read_csv(filename)) %>%
         mutate(algo = algo, balance = balance, run = run)
+    # TODO: There are inconsistent columns in the breitbart results
+    if("clf__tol" %in% colnames(data)) {
+        data = select(data, -clf__tol)    
+    }
+    return(data)
 }
 
 # TODO: If results for different query algorithms come in separate files, this 
@@ -38,14 +43,14 @@ proc_file = function(filename) {
 # proc_file() accordingly
 results = list()
 i = 1
-for(data_set in DATA_SETS[1:2]) {
+for(data_set in DATA_SETS) {
     
     cat('Processing ', data_set, '\n')    
     
     inpath = paste0(DATA_DIR, data_set) 
     files = list.files(inpath, recursive = TRUE, pattern = '\\d.csv$')
     files = paste0(inpath, '/', files)
-
+    
     data = do.call(rbind, lapply(files, proc_file)) %>%
         mutate(f1_score = ifelse(is.na(f1), 0, f1),
                precision = ifelse(is.na(p), 0, p),
@@ -55,9 +60,11 @@ for(data_set in DATA_SETS[1:2]) {
     results[[i]] = data
     i = i + 1
 }   
+
 data = do.call(rbind, results)
 data$data_set = recode(data$data_set, 'tweets' = 'Twitter', 
-                      'wikipedia_hate_speech' = 'Wikipedia')
+                      'wikipedia_hate_speech' = 'Wikipedia',
+                      'breitbart' = 'Breitbart')
 data = filter(data, balance %in% c("Balance: 0.01", "Balance: 0.10", 
                                    "Balance: 0.50"))
 n_dset = length(unique(data$data_set))
