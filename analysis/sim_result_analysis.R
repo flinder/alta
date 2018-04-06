@@ -157,25 +157,8 @@ ggsave('../presentation/figures/f1_labeled_support_balance_001.png',
 # Pre-pocessing choices
 # ==============================================================================
 
-pre_proc_data = list()
-i = 1 
-for(data_set in DATA_SETS) {
-     
-    cat('Processing ', data_set, '\n')    
-    
-    inpath = paste0(DATA_DIR, data_set) 
-    files = list.files(inpath, recursive = TRUE, pattern = '\\d.csv$')
-    files = paste0(inpath, '/', files)
-
-    pre_proc_data[[i]] = do.call(rbind, lapply(files, proc_file)) %>%
-        select(batch, support, text__selector__fname, algo, run, f1) %>%
-        mutate(balance = as.numeric(balance), data_set = data_set)
-    i = i + 1
-}
-pp_dat = do.call(rbind, pre_proc_data) %>%
-    filter(!is.na(text__selector__fname))
-
 # Parse out all preprocessing options from text selector argument    
+pp_dat = filter(data, !is.na(text__selector__fname))
 pp_info = pp_dat$text__selector__fname
 pp_dat$token_type = gsub("'", '', str_extract(pp_info, "'.+'"))
 pp_dat$gram_size = as.integer(gsub("'", '', str_extract(pp_info, "\\d")))
@@ -198,7 +181,6 @@ ggplot(plot_dat) +
              position = 'dodge', alpha = 0.8, color = 'white') +
     scale_fill_manual(values = pe$colors, name = 'Token\nWeight', 
                       labels = c('Count', 'Tf-Idf')) +
-    scale_x_discrete(labels = c('Twitter', 'Wikipedia')) +
     plot_theme + ylab('Optimal in Proportion of Runs') + xlab('')
 ggsave('../paper/figures/preproc_tfidf.png', 
        width = pe$p_width, height = 0.7*pe$p_width)
@@ -216,7 +198,7 @@ ggplot(plot_dat) +
              position = 'dodge', alpha = 0.8, color = 'white') +
     scale_fill_manual(values = pe$colors, name = 'Normalize', 
                       labels = c('Lemmatize', 'Stem')) +
-    scale_x_discrete(labels = c('Twitter', 'Wikipedia')) +
+    #scale_x_discrete(labels = c('Twitter', 'Wikipedia')) +
     plot_theme + ylab('Optimal in Proportion of Runs') + xlab('')
 ggsave('../paper/figures/preproc_stem.png', 
        width = pe$p_width, height = 0.7*pe$p_width)
@@ -234,7 +216,7 @@ ggplot(plot_dat) +
              position = 'dodge', alpha = 0.8, color = 'white') +
     scale_fill_manual(values = pe$colors, name = 'Token\nType',
                       labels = c('Character', 'Word')) +
-    scale_x_discrete(labels = c('Twitter', 'Wikipedia')) +
+    #scale_x_discrete(labels = c('Twitter', 'Wikipedia')) +
     plot_theme + ylab('Optimal in Proportion of Runs') + xlab('')
 ggsave('../paper/figures/preproc_token_type.png', 
        width = pe$p_width, height = 0.7*pe$p_width)
@@ -257,7 +239,7 @@ ggplot(plot_dat) +
     geom_bar(aes(x = data_set, y = prop, fill = gram_size), stat = 'identity',
              position = 'dodge', alpha = 0.8, color = 'white') +
     scale_fill_manual(values = pe$colors, name = 'Gram\nSize') +
-    scale_x_discrete(labels = c('Twitter', 'Wikipedia')) +
+    #scale_x_discrete(labels = c('Twitter', 'Wikipedia')) +
     plot_theme + ylab('Optimal in Proportion of Runs') + xlab('')
 ggsave('../paper/figures/preproc_gram_size.png', 
        width = pe$p_width, height = 0.7*pe$p_width)
