@@ -23,7 +23,8 @@ import warnings
 warnings.warn = warn
 
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score, make_scorer
+from sklearn.metrics import (f1_score, precision_score, recall_score,
+                             accuracy_score, make_scorer)
 from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.grid_search import RandomizedSearchCV
@@ -34,9 +35,14 @@ from sklearn.linear_model import SGDClassifier
 from helpers import DtmSelector
 
 parser = argparse.ArgumentParser()
-parser.add_argument("data", help="Valid choices are 'tweets' and 'wikipedia_hate_speech' 'breitbart'", type=str)
-parser.add_argument("--balance", help="Float, proportion of positive observations", type=float)
-parser.add_argument("--random", help="Random sampling.", dest='random', action='store_true')
+parser.add_argument("data", help=("Valid choices are 'tweets' and "
+                                  "'wikipedia_hate_speech' 'breitbart'", 
+                    type=str)
+parser.add_argument("--balance", 
+                    help="Float, proportion of positive observations", 
+                    type=float
+parser.add_argument("--random", help="Random sampling.", dest='random', 
+                    action='store_true')
 
 args = parser.parse_args()
 
@@ -47,8 +53,14 @@ CONFIG = '../config.yaml'
 with open(CONFIG) as config_file:
 	config = yaml.load(config_file)
 
-text_feature_sets = list(itertools.product(config["text_features"]["tfidf"], config["text_features"]["stem"], config["text_features"]["token_type"]))
-text_feature_sets = ['../data/dtms/' + '_'.join([args.data]+[str(x) for x in tf]) + '_dtm.pkl' for tf in text_feature_sets]
+text_feature_sets = list(itertools.product(config["text_features"]["tfidf"], 
+                                           config["text_features"]["stem"], 
+                                           config["text_features"]["token_type"]
+                                           )
+                                           )
+text_feature_sets = ['../data/dtms/' + '_'.join([args.data] + 
+                    [str(x) for x in tf]) + '_dtm.pkl' 
+                    for tf in text_feature_sets]
 
 #############################################################################
 # CLASS BALANCE
