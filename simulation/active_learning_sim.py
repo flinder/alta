@@ -14,7 +14,8 @@ from functools import reduce
 from operator import or_
 
 def merge(*dicts):
-    return { k: reduce(lambda d, x: x.get(k, d), dicts, None) for k in reduce(or_, map(lambda x: x.keys(), dicts), set()) }
+		return({ k: reduce(lambda d, x: x.get(k, d), dicts, None)
+							for k in reduce(or_, map(lambda x: x.keys(), dicts), set()) })
 
 ## Suppress sklearn warnings
 def warn(*args, **kwargs):
@@ -24,7 +25,7 @@ warnings.warn = warn
 
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import (f1_score, precision_score, recall_score,
-                             accuracy_score, make_scorer)
+														 accuracy_score, make_scorer)
 from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.grid_search import RandomizedSearchCV
@@ -35,14 +36,20 @@ from sklearn.linear_model import SGDClassifier
 from helpers import DtmSelector
 
 parser = argparse.ArgumentParser()
-parser.add_argument("data", help=("Valid choices are 'tweets' and "
-                                  "'wikipedia_hate_speech' 'breitbart'", 
-                    type=str)
-parser.add_argument("--balance", 
-                    help="Float, proportion of positive observations", 
-                    type=float
-parser.add_argument("--random", help="Random sampling.", dest='random', 
-                    action='store_true')
+
+parser.add_argument("data",
+	help="Valid choices are 'tweets' and 'wikipedia_hate_speech' 'breitbart'",
+	type=str
+)
+parser.add_argument("--balance",
+	help="Float, proportion of positive observations",
+	type=float
+)
+parser.add_argument("--random",
+	help="Random sampling.",
+	dest='random',
+	action='store_true'
+)
 
 args = parser.parse_args()
 
@@ -53,14 +60,16 @@ CONFIG = '../config.yaml'
 with open(CONFIG) as config_file:
 	config = yaml.load(config_file)
 
-text_feature_sets = list(itertools.product(config["text_features"]["tfidf"], 
-                                           config["text_features"]["stem"], 
-                                           config["text_features"]["token_type"]
-                                           )
-                                           )
-text_feature_sets = ['../data/dtms/' + '_'.join([args.data] + 
-                    [str(x) for x in tf]) + '_dtm.pkl' 
-                    for tf in text_feature_sets]
+text_feature_sets = list(
+											itertools.product(
+													config["text_features"]["tfidf"],
+													config["text_features"]["stem"],
+													config["text_features"]["token_type"]
+												)
+											)
+text_feature_sets = ['../data/dtms/' + '_'.join([args.data] +
+										[str(x) for x in tf]) + '_dtm.pkl'
+										for tf in text_feature_sets]
 
 #############################################################################
 # CLASS BALANCE
@@ -71,10 +80,10 @@ def balance_data(dat, balance):
 	# Get index of negative and postive rows
 	p_max = len(dat.loc[dat[y_col] == 1, ])
 	n_max = len(dat.loc[dat[y_col] == 0, ])
-	
+
 	# Get the balance in the data
-	original_balance = p_max / (n_max + p_max) 
-	
+	original_balance = p_max / (n_max + p_max)
+
 	# Pick the data
 	if balance >= original_balance:
 		# Use all positives and sample negatives
@@ -83,10 +92,10 @@ def balance_data(dat, balance):
 		pos_idx = dat[dat[y_col] == 1].index
 	else:
 		# Use all negatives and sample positives
-		n_pos = int(balance * n_max // (1 - balance)) 
+		n_pos = int(balance * n_max // (1 - balance))
 		neg_idx = dat[dat[y_col] == 0].index
 		pos_idx = dat[dat[y_col] == 1].sample(n_pos).index
-	
+
 	return neg_idx.append(pos_idx)
 
 #############################################################################
@@ -100,7 +109,10 @@ def get_sim_no(random, balance):
 	else:
 		r = 'active'
 	if balance is not None:
-		files = glob.glob('../data/runs/%s/*/%s_simulation_data_%.2f.csv' % (args.data, r, args.balance))
+		files = glob.glob(
+							'../data/runs/%s/*/%s_simulation_data_%.2f.csv' %
+							(args.data, r, args.balance)
+						)
 		files = [int(f.split('/')[4]) for f in files]
 		if len(files) > 0:
 			return max(files) + 1
@@ -131,22 +143,34 @@ def save_runs(runs, idx):
 	# save file to appropriate filename
 	if args.random:
 		if args.balance is not None:
-			with open(id_pref + 'random_simulation_id_%d_%.2f.pkl' % (len(runs), args.balance), 'wb') as f:
+			fn = id_pref + 'random_simulation_id_%d_%.2f.pkl' % (len(runs), args.balance)
+			with open(fn, 'wb') as f:
 				pickle.dump(runs, f, pickle.HIGHEST_PROTOCOL)
-			simulation_data.to_csv(run_pref + 'random_simulation_data_%.2f.csv' % args.balance, index=False)
+			simulation_data.to_csv(
+				run_pref + 'random_simulation_data_%.2f.csv' % args.balance, index=False
+			)
 		else:
-			with open(id_pref + 'random_simulation_id_%d.pkl' % len(runs), 'wb') as f:
+			fn = id_pref + 'random_simulation_id_%d.pkl' % len(runs)
+			with open(fn, 'wb') as f:
 				pickle.dump(runs, f, pickle.HIGHEST_PROTOCOL)
-			simulation_data.to_csv(run_pref + 'random_simulation_data.csv', index=False)
+			simulation_data.to_csv(
+				run_pref + 'random_simulation_data.csv', index=False
+			)
 	else:
 		if args.balance is not None:
-			with open(id_pref + 'active_simulation_id_%d_%.2f.pkl' % (len(runs), args.balance), 'wb') as f:
+			fn = id_pref + 'active_simulation_id_%d_%.2f.pkl' % (len(runs), args.balance)
+			with open(fn, 'wb') as f:
 				pickle.dump(runs, f, pickle.HIGHEST_PROTOCOL)
-			simulation_data.to_csv(run_pref + 'active_simulation_data_%.2f.csv' % args.balance, index=False)
+			simulation_data.to_csv(
+				run_pref + 'active_simulation_data_%.2f.csv' % args.balance, index=False
+			)
 		else:
-			with open(id_pref + 'active_simulation_id_%d.pkl' % len(runs), 'wb') as f:
+			fn = id_pref + 'active_simulation_id_%d.pkl' % len(runs)
+			with open(fn, 'wb') as f:
 				pickle.dump(runs, f, pickle.HIGHEST_PROTOCOL)
-			simulation_data.to_csv(run_pref + 'active_simulation_data.csv', index=False)
+			simulation_data.to_csv(
+				run_pref + 'active_simulation_data.csv', index=False
+			)
 
 #############################################################################
 # INITIAL SAMPLING / DEV SET
@@ -166,7 +190,12 @@ else:
 	all_idxs = data.index
 	n_records = len(data)
 
-train, test, train_y, test_y = train_test_split(all_idxs, data.ix[all_idxs, y_col], test_size=0.2, random_state=1988)
+train, test, train_y, test_y = train_test_split(
+																	all_idxs,
+																	data.ix[all_idxs, y_col],
+																	test_size=0.2,
+																	random_state=1988
+																)
 
 class_counter = Counter(train_y)
 print("Positive observations: %d" % class_counter[1])
@@ -235,7 +264,12 @@ for i in range(n_steps):
 
 	y_unlabeled_true = unlabeled[y_col]
 
-	X_train, X_test, y_train, y_test = train_test_split(list(labeled_ids), y_true, test_size=0.20, random_state=64)
+	X_train, X_test, y_train, y_test = train_test_split(
+																			list(labeled_ids),
+																			y_true,
+																			test_size=0.20,
+																			random_state=64
+																		)
 	X_train = np.array(X_train)
 	X_test = np.array(X_test)
 	X_pred = np.array(unlabeled_ids)
@@ -243,7 +277,14 @@ for i in range(n_steps):
 
 	n_jobs = config['data_sets'][args.data]['n_jobs']
 	## Randomized hyperparameter search
-	grid = RandomizedSearchCV(pipeline, parameters, n_iter=20, scoring=make_scorer(f1_score), n_jobs=n_jobs, random_state=1988)
+	grid = RandomizedSearchCV(
+					pipeline,
+					parameters,
+					n_iter=20,
+					scoring=make_scorer(f1_score),
+					n_jobs=n_jobs,
+					random_state=1988
+				)
 	try:
 		grid.fit(X_train, y_train)
 	except ValueError:
@@ -261,8 +302,16 @@ for i in range(n_steps):
 	n_pos = np.sum(y_pred)
 
 	support = len([y for y in y_true if y == 1])
-	print("Batch %d/%d - F: %.2f, P: %.2f, R: %.2f, n_pos_pred: %d, pos_sup: %d, sup: %d" % (i+1, n_steps+1, f1, p, r, n_pos, support, (i+1) * stepsize))
-	run = {'f1' : f1, 'p' : p, 'r' : r, 'n_pos_pred' : n_pos, 'support' : support, 'batch' : i}
+	out = "%d/%d - F: %.2f, P: %.2f, R: %.2f, n_pos_pred: %d, pos_sup: %d, sup: %d"
+				% (i+1, n_steps+1, f1, p, r, n_pos, support, (i+1) * stepsize)
+	print(out)
+	run = {	'f1' : f1,
+					'p' : p,
+					'r' : r,
+					'n_pos_pred' : n_pos,
+					'support' :
+					support, 'batch' : i
+				}
 	run = merge(run, grid.best_params_)
 	runs.append(run)
 
