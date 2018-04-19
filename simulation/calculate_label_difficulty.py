@@ -9,13 +9,13 @@ from collections import Counter
 
 ## Suppress sklearn warnings
 def warn(*args, **kwargs):
-	pass
+    pass
 import warnings
 warnings.warn = warn
 
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import (f1_score, precision_score, recall_score,
-														 accuracy_score, make_scorer)
+                                                         accuracy_score, make_scorer)
 from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.grid_search import RandomizedSearchCV
@@ -33,18 +33,15 @@ CONFIG = '../config.yaml'
 
 # load config
 with open(CONFIG) as config_file:
-	config = yaml.load(config_file)
+    config = yaml.load(config_file)
 
-text_feature_sets = list(
-											itertools.product(
-													config["text_features"]["tfidf"],
-													config["text_features"]["stem"],
-													config["text_features"]["token_type"]
-												)
-											)
+text_feature_sets = list(itertools.product(config["text_features"]["tfidf"],
+                                           config["text_features"]["stem"],
+                                           config["text_features"]["token_type"]
+                                           ))
 text_feature_sets = ['../data/dtms/' + '_'.join([dataset] +
-										[str(x) for x in tf]) + '_dtm.pkl'
-										for tf in text_feature_sets]
+                                        [str(x) for x in tf]) + '_dtm.pkl'
+                                        for tf in text_feature_sets]
 
 fname = config['data_sets'][dataset]['fname']
 y_col = config['data_sets'][dataset]['y_col']
@@ -54,48 +51,47 @@ all_idxs = data.index
 
 result_fn = '../data/difficulty_simulation_%s.csv' % dataset
 if os.path.isfile(result_fn):
-	all_results = pd.read_csv(result_fn)
+    all_results = pd.read_csv(result_fn)
 all_results = pd.DataFrame()
 for i in range(1000):
-	print("Starting iteration %d" % i)
-	train, test, train_y, test_y = train_test_split(
-																		all_idxs,
-																		data.ix[all_idxs, y_col],
-																		test_size=0.2,
-																	)
+    print("Starting iteration %d" % i)
+    train, test, train_y, test_y = train_test_split(all_idxs, 
+                                                    data.ix[all_idxs, y_col],
+                                                    test_size=0.2)
 
-	svm = LinearSVC(penalty='l2', class_weight='balanced', random_state=1988)
-	clf = CalibratedClassifierCV(svm)
+    svm = LinearSVC(penalty='l2', class_weight='balanced', random_state=1988)
+    clf = CalibratedClassifierCV(svm)
 
-	parameters = {
-		'clf__base_estimator__C': expon(50),
-		'clf__base_estimator__class_weight': ['balanced', None],
-		'text__selector__fname': text_feature_sets,
-	}
+    parameters = {
+        'clf__base_estimator__C': expon(50),
+        'clf__base_estimator__class_weight': ['balanced', None],
+        'text__selector__fname': text_feature_sets,
+    }
 
-	## Model pipeline
-	pipeline = Pipeline([
-			('text', Pipeline([
-				('selector', DtmSelector(fname=text_feature_sets[0])),
-				('tfidf', TfidfTransformer())
-			])),
-			('clf', clf),
-	])
+    ## Model pipeline
+    pipeline = Pipeline([
+            ('text', Pipeline([
+                ('selector', DtmSelector(fname=text_feature_sets[0])),
+                ('tfidf', TfidfTransformer())
+            ])),
+            ('clf', clf),
+    ])
 
-	## Grid hyperparameter search
-	grid = RandomizedSearchCV(
-					pipeline,
-					parameters,
-					n_iter=10,
-					scoring=make_scorer(f1_score),
-					n_jobs=1,
-					random_state=1988
-				)
+    ## Grid hyperparameter search
+    grid = RandomizedSearchCV(
+                    pipeline,
+                    parameters,
+                    n_iter=10,
+                    scoring=make_scorer(f1_score),
+                    n_jobs=1,
+                    random_state=1988
+                )
 
-	grid.fit(train, train_y)
-	y_proba = clf.predict_proba(test)
-	results = {'id' : test, 'p' : y_proba}
-	results = pd.DataFrame(results)
-	results['i'] = i
-	all_results = all_results.append(results)
-	all_results.to_csv(result_fn, index=False)
+    grid.fit(train, train_y)
+    y_proba = clf.predict_proba(test)
+    results = {'id' : test, 'p' : y_proba}
+    results = pd.DataFrame(results)
+    results['i'] = i
+    all_results = all_results.append(results)
+    all_results.to_csv(result_fn, index=False)
+    pickle.dump(open('../data/difficulty_sim_results.p', 'wb'))
