@@ -2,6 +2,7 @@ import glob
 import itertools
 import pandas as pd
 import numpy as np
+import os
 import yaml
 from scipy.stats import expon, beta, rv_continuous
 
@@ -61,7 +62,7 @@ for i in range(1000):
 	train, test, train_y, test_y = train_test_split(
 																		all_idxs,
 																		data.ix[all_idxs, y_col],
-																		test_size=0.2,
+																		test_size=0.4,
 																	)
 
 	svm = LinearSVC(penalty='l2', class_weight='balanced', random_state=1988)
@@ -86,7 +87,7 @@ for i in range(1000):
 	grid = RandomizedSearchCV(
 					pipeline,
 					parameters,
-					n_iter=10,
+					n_iter=5,
 					scoring=make_scorer(f1_score),
 					n_jobs=1,
 					random_state=1988
