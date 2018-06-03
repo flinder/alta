@@ -320,4 +320,5 @@ for i in range(n_steps):
 			to_code = random.sample(unlabeled_ids, stepsize)
 	labeled_ids.update(to_code)
 
-save_runs(runs, labeled_ids)
+simulation_data = pd.DataFrame(runs)
+simulation_data.to_csv(fn, index=False)
