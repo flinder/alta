@@ -45,19 +45,17 @@ parser.add_argument("--balance",
 	help="Float, proportion of positive observations",
 	type=float
 )
+parser.add_argument("--iter",
+	help="Integer, the current iteration.",
+	type=int
+)
 parser.add_argument("--icr",
 	help="Float, probability of correctly labeling an observation.",
 	type=float
 )
-parser.add_argument("--random",
-	help="Random sampling.",
-	dest='random',
-	action='store_true'
-)
-parser.add_argument("--difficulty",
-	help="ICR is weighted by difficulty of a point.",
-	dest='random',
-	action='store_true'
+parser.add_argument("--mode",
+	help="'random' for random sampling or 'active' for active learning.",
+	type=str,
 )
 
 args = parser.parse_args()
@@ -83,6 +81,12 @@ text_feature_sets = ['../data/dtms/' + '_'.join([args.data] +
 #############################################################################
 # CLASS BALANCE
 #############################################################################
+
+def icr_distort(ys, p):
+	new_y = []
+	for y in ys:
+		new_y.append(y if random.random() < p else abs(y-1))
+	return new_y
 
 def balance_data(dat, balance):
 
@@ -111,53 +115,22 @@ def balance_data(dat, balance):
 # SAVING SIMULATION DATA
 #############################################################################
 
-def get_dir_prefix(sim_no):
-	# create simulation directory if it does not exist
-	id_pref = '../data/index_checkpoints/%s/%d/' % (args.data, sim_no)
-	if not os.path.exists(id_pref):
-		os.makedirs(id_pref)
-	run_pref = '../data/runs/%s/%d/' % (args.data, sim_no)
-	if not os.path.exists(run_pref):
-		os.makedirs(run_pref)
-	return(id_pref, run_pref)
+# save file to appropriate filename
+rand = args.mode
+if args.balance:
+	if args.icr:
+		fn = '../data/runs/%s/%s/%s_simulation_data_%s_icr_%s.csv' % (args.data, str(args.iter), rand, str(args.balance), str(args.icr))
+	else:
+		fn = '../data/runs/%s/%s/%s_simulation_data_%s.csv' % (args.data, str(args.iter), rand, str(args.balance))
+else:
+	if args.icr:
+		fn = '../data/runs/%s/%s/%s_simulation_data_icr_%s.csv' % (args.data, str(args.iter), rand, str(args.icr))
+	else:
+		fn = '../data/runs/%s/%s/%s_simulation_data.csv' % (args.data, str(args.iter), rand)
 
-def save_runs(runs, idx):
-	## Save runs from list of dictionaries to CSV
-	simulation_data = pd.DataFrame(runs)
-
-	# Find simulation number and appropriate directory
-	directories = glob.glob('../data/index_checkpoints/%s/*' % args.data)
-	sim_no = max([int(d.split('/')[-1]) for d in directories])
-	current_dir = '../data/index_checkpoints/%s/%d/' % (args.data, sim_no)
-	# All files have been created, move to next directory
-	# (hacky; will move on even if simulations are not complete in this dir)
-
-	# save file to appropriate filename
-	rand = 'active'
-	if args.random:
-		rand = 'random'
-
-	icr_str = None
-	if args.icr is not None:
-		icr_str = 'icr'
-
-	id_pref, run_pref = get_dir_prefix(sim_no)
-
-	fn_id_comps = [rand, 'simulation_id', str(len(runs)), str(args.balance), icr_str, str(args.icr)]
-	fn_id = id_pref + '_'.join(fn for fn in fn_id_comps if fn is not None) + ".pkl"
-
-	fn_sim_dat_comps = [rand, 'simulation_data', str(args.balance), icr_str, str(args.icr)]
-	fn_sim = run_pref + '_'.join(fn for fn in fn_sim_dat_comps if fn is not None) + ".csv"
-
-	if os.path.isfile(fn_id):
-		sim_no += 1
-		id_pref, run_pref = get_dir_prefix(sim_no)
-		fn_id = id_pref + '_'.join(fn for fn in fn_id_comps if fn is not None) + ".pkl"
-		fn_sim = run_pref + '_'.join(fn for fn in fn_sim_dat_comps if fn is not None) + ".csv"
-
-	with open(fn_id, 'wb') as f:
-		pickle.dump(runs, f, pickle.HIGHEST_PROTOCOL)
-	simulation_data.to_csv(fn_sim, index=False)
+if os.path.isfile(fn):
+	print("Simulation already completed: %s" % fn)
+	quit()
 
 #############################################################################
 # INITIAL SAMPLING / DEV SET
@@ -183,6 +156,10 @@ train, test, train_y, test_y = train_test_split(
 																	test_size=0.2,
 																	random_state=1988
 																)
+
+if args.icr:
+	train_y = icr_distort(train_y, args.icr)
+	data.ix[train, y_col + '_icr'] = train_y
 
 class_counter = Counter(train_y)
 print("Positive observations: %d" % class_counter[1])
@@ -237,7 +214,7 @@ if n_steps < 200:
 	n_steps = min(n_records // stepsize, 200)
 
 ## Get initial labels
-labeled_ids = set(random.sample(list(all_idxs), 20))
+labeled_ids = set(random.sample(list(train), 20))
 
 print('beginning steps')
 for i in range(n_steps):
@@ -245,7 +222,10 @@ for i in range(n_steps):
 	to_code = []
 
 	labeled = data.ix[list(labeled_ids), :]
-	y_true = labeled[y_col]
+	if args.icr:
+		y_true = labeled[y_col + "_icr"]
+	else:
+		y_true = labeled[y_col]
 
 	unlabeled_ids = list(set(train) - set(labeled_ids))
 	unlabeled = data.ix[unlabeled_ids, :]
@@ -281,15 +261,7 @@ for i in range(n_steps):
 		labeled_ids.update(set(random.sample(unlabeled_ids, 20)))
 		continue
 
-	def icr_distort(y_pred, p):
-		new_y = []
-		for y in y_pred:
-			new_y.append(y if random.random() < p else abs(y-1))
-		return new_y
-
 	y_pred = grid.predict(X_dev)
-	if args.icr is not None:
-		y_pred = icr_distort(y_pred, args.icr)
 
 	## Evaluate F1 on development set, save in dictionary
 	f1 = f1_score(test_y, y_pred)
@@ -311,9 +283,11 @@ for i in range(n_steps):
 	runs.append(run)
 
 	if ((i+1) * stepsize) % 500 == 0:
-		save_runs(runs, labeled_ids)
+		## Save runs from list of dictionaries to CSV
+		simulation_data = pd.DataFrame(runs)
+		simulation_data.to_csv(fn, index=False)
 
-	if args.random == False:
+	if args.mode == 'active':
 		try:
 			dist_to_hp = grid.decision_function(X_pred)
 		except ValueError:
