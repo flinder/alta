@@ -128,7 +128,7 @@ else:
 	else:
 		fn = '../data/runs/%s/%s/%s_simulation_data.csv' % (args.data, str(args.iter), rand)
 
-if os.path.isfile(fn):
+if os.path.isfile(fn) or os.path.isfile(fn.replace('.csv','0.csv')):
 	print("Simulation already completed: %s" % fn)
 	quit()
 

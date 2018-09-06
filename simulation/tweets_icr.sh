@@ -1,9 +1,9 @@
 #!/bin/bash
-for i in {0..49};
+for i in {0..9};
 do
     for ICR in .7 .8 .85 .9 .95;
     do
-        for BALANCE in .05 .1 .5 .01;
+        for BALANCE in .01 .05 .1 .5;
         do
             for MODE in 'active' 'random';
             do
