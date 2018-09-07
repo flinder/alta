@@ -9,6 +9,7 @@ data_sets:
         n_jobs: 4
         n_cap: null
         sgd: false
+        n_docs: 24420
     wikipedia_hate_speech:
         fname: 'wikipedia_hate_speech.csv'
         text_col: 'comment_text'
@@ -24,6 +25,7 @@ data_sets:
         n_jobs: 4
         n_cap: null
         sgd: false
+        n_docs: 159571
     breitbart:
         fname: 'breitbart_data.csv'
         text_col: 'text'
@@ -34,6 +36,7 @@ data_sets:
         n_jobs: 4
         n_cap: null
         sgd: false
+        n_docs: 174847
 text_features:
     tfidf: [on, off]
     stem: [on, off]

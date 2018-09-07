@@ -15,6 +15,7 @@ BATCH_SIZE = 20 # Size of AL batches should probably be loaded form config.yaml
 DATA_SETS = names(proj_conf$data_sets)
 DATA_DIR = "../data/runs/"
 
+
 pe = plot_elements()
 plot_theme = pe$theme +
     theme(strip.text.x = element_text(size = 14))
@@ -25,15 +26,25 @@ htwr_pres = 0.7
 # ==============================================================================
 # Data prep
 # ==============================================================================
-
-proc_file = function(filename) {
+proc_file = function(filename, data_set) {
+    cat(filename, '\n')
     comp = unlist(strsplit(filename, '/'))
     run = as.integer(comp[5])
     comp_2 = unlist(strsplit(comp[6], '_'))
     algo = comp_2[1]
-    balance = gsub('\\.csv', '', comp_2[4])
+    balance = as.numeric(gsub('\\.csv', '', comp_2[4]))
+    if(is.element('icr', comp_2)) {
+        icr = as.numeric(gsub('\\.csv', '', comp_2[6]))
+    } else {
+        icr = NA
+    }
+    # This file is corrupted somehow so I'll skip it 
+    if(filename == '../data/runs/wikipedia_hate_speech/10/random_simulation_data_0.10.csv') {
+        return(NA)
+    }
     data = suppressMessages(read_csv(filename)) %>%
-        mutate(algo = algo, balance = balance, run = run)
+        mutate(algo = algo, balance = balance, run = run, icr = icr,
+               total_samples = proj_conf$data_sets[[data_set]]$n_docs)       
     # TODO: There are inconsistent columns in the breitbart results
     if("clf__tol" %in% colnames(data)) {
         data = select(data, -clf__tol)    
@@ -54,8 +65,9 @@ for(data_set in DATA_SETS) {
     files = list.files(inpath, recursive = TRUE, pattern = '\\d.csv$')
     files = paste0(inpath, '/', files)
     
-    data = do.call(rbind, lapply(files, proc_file)) %>%
-        mutate(f1_score = ifelse(is.na(f1), 0, f1),
+    dfs = lapply(files, proc_file, data_set) 
+    data = do.call(rbind, dfs) %>%
+        mutate(f1_kcore = ifelse(is.na(f1), 0, f1),
                precision = ifelse(is.na(p), 0, p),
                recall = ifelse(is.na(r), 0, r),
                balance = paste0("Balance: ", balance),
@@ -63,38 +75,39 @@ for(data_set in DATA_SETS) {
     results[[i]] = data
     i = i + 1
 }   
+#save(results, file = 'results_cache.RData')
 
+#load('results_cache.RData')
 data = do.call(rbind, results)
 data$data_set = recode(data$data_set, 'tweets' = 'Twitter', 
                       'wikipedia_hate_speech' = 'Wikipedia',
                       'breitbart' = 'Breitbart')
-data = filter(data, balance %in% c("Balance: 0.01", "Balance: 0.05", 
-                                   "Balance: 0.10", "Balance: 0.50"))
-# Placeholder for Breitbart 0.05 results:
-ph = data[1, ]
-ph$f1_score = 0
-ph$precision = 0
-ph$recall = 0
-ph$balance = 'Balance: 0.05'
-ph$data_set = 'Breitbart'
-data = rbind(data, ph)
+icr_data = filter(data, !is.na(icr))
+data = filter(data, balance %in% c("Balance: 0.01", "Balance: 0.1", 
+                                   "Balance: 0.3", "Balance: 0.5"))
 
 n_dset = length(unique(data$data_set))
+
+# separate out the intercoder reliability runs
+data = filter(data, is.na(icr)) %>% select(-icr)
 
 # ==============================================================================
 # Visualize results
 # ==============================================================================
 
 # F1 score
-#data = filter(data, batch * BATCH_SIZE <= 1000)
-ggplot(data, aes(x = batch * BATCH_SIZE, y = f1, color = algo,
-                 linetype = algo)) +
-    facet_wrap(~balance + data_set, scales = 'fixed', ncol = n_dset) +
+data = filter(data, batch * BATCH_SIZE <= 4000)
+ggplot(data, aes(x = batch * BATCH_SIZE #/ total_samples * 100
+                 , y = f1, 
+                 color = algo, linetype = algo)) +
+    facet_wrap(~balance + data_set, scales = 'free', ncol = n_dset) +
     geom_point(size = 0.05, alpha = 0.05) + 
     geom_smooth() +
     scale_color_manual(values = pe$colors, name = 'Labeling\nAlgorithm') +
     scale_linetype(name = 'Labeling\nAlgorithm') +
-    ylab('F1 Score') + xlab('# labeled samples') +
+    ylab('F1 Score') + 
+    xlab('# of labeled samples') + 
+    #xlab('% of samples labeled') +
     plot_theme
 ggsave('../paper/figures/main_results_f1.png', width = pe$p_width, 
        height = htwr*pe$p_width)
@@ -102,9 +115,10 @@ ggsave('../presentation/figures/main_results_f1.png', width = pe$p_width,
        height = htwr_pres*pe$p_width)
 
 # Precision
-ggplot(data, aes(x = batch * BATCH_SIZE, y = precision, color = algo,
-                 linetype = algo)) +
-    facet_wrap(~balance + data_set, scales = 'fixed', ncol = n_dset) +
+ggplot(data, aes(x = batch * BATCH_SIZE #/ total_samples * 100
+                 , 
+                 y = precision, color = algo, linetype = algo)) +
+    facet_wrap(~balance + data_set, scales = 'free', ncol = n_dset) +
     geom_point(size = 0.05, alpha = 0.05) + 
     geom_smooth() +
     scale_color_manual(values = pe$colors, name = 'Labeling\nAlgorithm') +
@@ -117,9 +131,10 @@ ggsave('../presentation/figures/main_results_precision.png',
        width = pe$p_width, height = htwr_pres*pe$p_width)
 
 # Recall
-ggplot(data, aes(x = batch * BATCH_SIZE, y = recall, color = algo,
-                 linetype = algo)) +
-    facet_wrap(~balance + data_set, scales = 'fixed', ncol = n_dset) +
+ggplot(data, aes(x = batch * BATCH_SIZE #/ total_samples * 100
+                 , 
+                 y = recall, color = algo, linetype = algo)) +
+    facet_wrap(~balance + data_set, scales = 'free', ncol = n_dset) +
     geom_point(size = 0.05, alpha = 0.05) + 
     geom_smooth() +
     scale_color_manual(values = pe$colors, name = 'Labeling\nAlgorithm') +
@@ -132,13 +147,18 @@ ggsave('../presentation/figures/main_results_recall.png',
        width = pe$p_width, height = htwr_pres*pe$p_width)
 
 # Visualize support growth
-d = filter(data, balance == 'Balance: 0.01') %>%
+data = do.call(rbind, results)
+data$data_set = recode(data$data_set, 'tweets' = 'Twitter', 
+                      'wikipedia_hate_speech' = 'Wikipedia',
+                      'breitbart' = 'Breitbart')
+d = filter(data, balance == 'Balance: 0.05') %>%
     group_by(batch, algo, data_set) %>%
-    summarize(mean_f1 = mean(f1_score), mean_support = mean(support))
+    summarize(mean_f1 = mean(f1_kcore), mean_support = mean(support))
 #total_positives = proj_conf$data_sets$tweets$n_positive
 
-ggplot(d, aes(x = batch * BATCH_SIZE, y = mean_f1, color = algo,
-              size = mean_support)) + 
+ggplot(d, aes(x = batch * BATCH_SIZE #/ total_samples * 100
+              , 
+              y = mean_f1, color = algo, size = mean_support)) + 
     facet_wrap(~data_set, ncol = 1) +
     geom_point(alpha = 0.4) + 
     #geom_line(size = 1) +
@@ -224,7 +244,7 @@ ggsave('../presentation/figures/preproc_token_type.png',
        width = pe$p_width, height = 0.7*pe$p_width)
 
 
-## Token type
+## Gram Size
 ## +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 plot_dat = group_by(pp_dat, data_set, gram_size, token_type) %>%
     summarize(count = n()) %>%
@@ -306,6 +326,25 @@ ggsave('../paper/figures/preproc_f1_stem.png',
        width = pe$p_width, height = 0.7*pe$p_width)
 ggsave('../presentation/figures/preproc_f1_stem.png', 
        width = pe$p_width, height = 0.7*pe$p_width)
+
+# ==============================================================================
+# Intercoder reliability plots
+# ==============================================================================
+icr_data = filter(icr_data, balance %in% c("Balance: 0.05", "Balance: 0.1"))
+n_icr = length(unique(icr_data$icr))
+ggplot(icr_data, aes(x = batch * BATCH_SIZE, y = f1, color = algo,
+                 linetype = algo)) +
+    facet_wrap(~balance + icr, scales = 'free', ncol = n_icr) +
+    geom_point(size = 0.05, alpha = 0.05) +
+    geom_smooth() +
+    scale_color_manual(values = pe$colors, name = 'Labeling\nAlgorithm') +
+    scale_linetype(name = 'Labeling\nAlgorithm') +
+    ylab('F1 Score') + xlab('# labeled samples') +
+    plot_theme
+ggsave('../paper/figures/icr_results_f1.png', width = pe$p_width, 
+       height = htwr*pe$p_width)
+ggsave('../presentation/figures/icr_results_f1.png', width = pe$p_width, 
+       height = htwr_pres*pe$p_width)
 
 # ==============================================================================
 # Plots exclusively for presentation
