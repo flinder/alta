@@ -151,16 +151,16 @@ data = do.call(rbind, results)
 data$data_set = recode(data$data_set, 'tweets' = 'Twitter', 
                       'wikipedia_hate_speech' = 'Wikipedia',
                       'breitbart' = 'Breitbart')
-d = filter(data, balance == 'Balance: 0.05') %>%
+d = filter(data, balance == 'Balance: 0.01') %>%
     group_by(batch, algo, data_set) %>%
     summarize(mean_f1 = mean(f1_kcore), mean_support = mean(support))
 #total_positives = proj_conf$data_sets$tweets$n_positive
 
-ggplot(d, aes(x = batch * BATCH_SIZE #/ total_samples * 100
-              , 
+ggplot(filter(d, (batch * BATCH_SIZE) < 5000), 
+              aes(x = batch * BATCH_SIZE, 
               y = mean_f1, color = algo, size = mean_support)) + 
     facet_wrap(~data_set, ncol = 1) +
-    geom_point(alpha = 0.4) + 
+    geom_point(alpha = 0.4) +
     #geom_line(size = 1) +
     scale_color_manual(values = pe$colors, name = 'Labeling\nAlgorithm') +
     scale_linetype(name = 'Labeling\nAlgorithm') +
@@ -331,7 +331,13 @@ ggsave('../presentation/figures/preproc_f1_stem.png',
 # Intercoder reliability plots
 # ==============================================================================
 icr_data = filter(icr_data, balance %in% c("Balance: 0.05", "Balance: 0.1"))
-n_icr = length(unique(icr_data$icr))
+icr_levels = unique(icr_data$icr)
+n_icr = length(icr_levels)
+
+for(l in icr_levels) {
+    icr_data$icr[icr_data$icr == l] = paste0('Reliability: ', l)
+}
+
 ggplot(icr_data, aes(x = batch * BATCH_SIZE, y = f1, color = algo,
                  linetype = algo)) +
     facet_wrap(~balance + icr, scales = 'free', ncol = n_icr) +
@@ -341,9 +347,9 @@ ggplot(icr_data, aes(x = batch * BATCH_SIZE, y = f1, color = algo,
     scale_linetype(name = 'Labeling\nAlgorithm') +
     ylab('F1 Score') + xlab('# labeled samples') +
     plot_theme
-ggsave('../paper/figures/icr_results_f1.png', width = pe$p_width, 
+ggsave('../paper/figures/icr_results_f1.png', width = 1.3 * pe$p_width, 
        height = htwr*pe$p_width)
-ggsave('../presentation/figures/icr_results_f1.png', width = pe$p_width, 
+ggsave('../presentation/figures/icr_results_f1.png', width = 1.3 * pe$p_width, 
        height = htwr_pres*pe$p_width)
 
 # ==============================================================================
