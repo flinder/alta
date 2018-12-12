@@ -6,7 +6,7 @@ data_sets:
             - 'annotation'
         language: 'de'
         y_col: 'annotation'
-        n_jobs: 4
+        n_jobs: 16
         n_cap: null
         sgd: false
         n_docs: 24420

@@ -1,9 +1,9 @@
 #!/bin/bash
-for i in {0..49};
+for i in {50..70};
 do
-    for DATASET in 'tweets' 'wikipedia_hate_speech' 'breitbart';
+    for DATASET in 'tweets';
     do
-        for BALANCE in .01 .05 .1 .5;
+        for BALANCE in .01 .05 .1 .3 .5;
         do
             for MODE in 'active' 'random';
             do
