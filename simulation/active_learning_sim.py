@@ -80,7 +80,7 @@ text_feature_sets = list(
 		config["text_features"]["token_type"]
 	)
 )
-text_feature_sets = ['/Users/blakemiller/Box Sync/alta_data/dtms/' + '_'.join([args.data] +
+text_feature_sets = ['../data/dtms/' + '_'.join([args.data] +
 	[str(x) for x in tf]) + '_dtm.pkl'
 	for tf in text_feature_sets]
 
@@ -125,14 +125,14 @@ def balance_data(dat, balance):
 rand = args.mode
 if args.balance:
 	if args.icr:
-		fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_%s_icr_%s_%s.csv' % (args.data, str(args.iter), rand, str(args.icr), args.query_strat, str(args.balance))
+		fn = '../data/runs/%s/%s/%s_simulation_data_%s_icr_%s_%s.csv' % (args.data, str(args.iter), rand, str(args.icr), args.query_strat, str(args.balance))
 	else:
-		fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_%s_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.balance))
+		fn = '../data/runs/%s/%s/%s_simulation_data_%s_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.balance))
 else:
 	if args.icr:
-		fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_icr_%s_%s.csv' % (args.data, str(args.iter), rand, str(args.icr), args.query_strat)
+		fn = '../data/runs/%s/%s/%s_simulation_data_icr_%s_%s.csv' % (args.data, str(args.iter), rand, str(args.icr), args.query_strat)
 	else:
-		fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_%s.csv' % (args.data, str(args.iter), rand, args.query_strat)
+		fn = '../data/runs/%s/%s/%s_simulation_data_%s.csv' % (args.data, str(args.iter), rand, args.query_strat)
 
 if os.path.isfile(fn) or os.path.isfile(fn.replace('.csv','0.csv')):
 	print("Simulation already completed: %s" % fn)
@@ -144,7 +144,7 @@ if os.path.isfile(fn) or os.path.isfile(fn.replace('.csv','0.csv')):
 
 fname = config['data_sets'][args.data]['fname']
 y_col = config['data_sets'][args.data]['y_col']
-data = pd.read_csv("/Users/blakemiller/Box Sync/alta_data/%s" % fname, dtype={y_col: 'int'})
+data = pd.read_csv("../data/%s" % fname, dtype={y_col: 'int'})
 
 if config['data_sets'][args.data]['n_cap'] is not None:
 	data = data.sample(config['data_sets'][args.data]['n_cap'])
@@ -307,7 +307,7 @@ for i in range(n_steps):
 	grid = RandomizedSearchCV(
 					pipeline,
 					svm_parameters,
-					n_iter=5,
+					n_iter=20,
 					scoring=make_scorer(f1_score),
 					n_jobs=n_jobs
 				)
@@ -324,7 +324,7 @@ for i in range(n_steps):
 			fit_models[model] = RandomizedSearchCV(
 				pipelines[model],
 				parameters[model],
-				n_iter=20,
+				n_iter=5,
 				scoring=make_scorer(f1_score),
 				n_jobs=n_jobs
 			).fit(X_train, y_train)
