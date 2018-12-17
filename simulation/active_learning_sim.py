@@ -84,7 +84,7 @@ text_feature_sets = list(
 		config["text_features"]["token_type"]
 	)
 )
-text_feature_sets = ['../data/dtms/' + '_'.join([args.data] +
+text_feature_sets = ['/Users/blakemiller/Box Sync/alta_data/dtms/' + '_'.join([args.data] +
 	[str(x) for x in tf]) + '_dtm.pkl'
 	for tf in text_feature_sets]
 
@@ -139,25 +139,25 @@ rand = args.mode
 if args.balance:
 	if args.icr:
 		if args.pct_random is not None:
-			fn = '../data/runs/%s/%s/%s_simulation_data_%s_icr_%s_%s_rand_%s.csv' % (args.data, str(args.iter), rand, str(args.icr), args.query_strat, str(args.balance), str(args.pct_random))
+			fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_%s_%s_icr_%s_rand_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.balance), str(args.icr), str(args.pct_random))
 		else:
-			fn = '../data/runs/%s/%s/%s_simulation_data_%s_icr_%s_%s.csv' % (args.data, str(args.iter), rand, str(args.icr), args.query_strat, str(args.balance))
+			fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_%s_%s_icr_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.balance), str(args.icr))
 	else:
 		if args.pct_random is not None:
-			fn = '../data/runs/%s/%s/%s_simulation_data_%s_%s_rand_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.balance), str(args.pct_random))
+			fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_%s_%s_rand_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.balance), str(args.pct_random))
 		else:
-			fn = '../data/runs/%s/%s/%s_simulation_data_%s_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.balance))
+			fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_%s_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.balance))
 else:
 	if args.icr:
 		if args.pct_random is not None:
-			fn = '../data/runs/%s/%s/%s_simulation_data_icr_%s_%s_rand_%s.csv' % (args.data, str(args.iter), rand, str(args.icr), args.query_strat, str(args.pct_random))
+			fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_%s_icr_%s_rand_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.icr), str(args.pct_random))
 		else:
-			fn = '../data/runs/%s/%s/%s_simulation_data_icr_%s_%s.csv' % (args.data, str(args.iter), rand, str(args.icr), args.query_strat)
+			fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_%s_icr_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.icr))
 	else:
 		if args.pct_random is not None:
-			fn = '../data/runs/%s/%s/%s_simulation_data_%s_rand_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.pct_random))
+			fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_%s_rand_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.pct_random))
 		else:
-			fn = '../data/runs/%s/%s/%s_simulation_data_%s.csv' % (args.data, str(args.iter), rand, args.query_strat)
+			fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_%s.csv' % (args.data, str(args.iter), rand, args.query_strat)
 
 if os.path.isfile(fn) or os.path.isfile(fn.replace('.csv','0.csv')):
 	print("Simulation already completed: %s" % fn)
@@ -169,7 +169,7 @@ if os.path.isfile(fn) or os.path.isfile(fn.replace('.csv','0.csv')):
 
 fname = config['data_sets'][args.data]['fname']
 y_col = config['data_sets'][args.data]['y_col']
-data = pd.read_csv("../data/%s" % fname, dtype={y_col: 'int'})
+data = pd.read_csv("/Users/blakemiller/Box Sync/alta_data/%s" % fname, dtype={y_col: 'int'})
 
 if config['data_sets'][args.data]['n_cap'] is not None:
 	data = data.sample(config['data_sets'][args.data]['n_cap'])
@@ -413,32 +413,6 @@ for i in range(n_steps):
 				to_code.extend(get_random(list(set(unlabeled_ids) - set(active_ids)), (stepsize - len(active_ids))))
 			else:
 				to_code.extend(sorted_ids[:stepsize])
-			'''dist_uc_pos = [d for d in dist_uc if d[1] >= 0]
-			dist_uc_neg = [d for d in dist_uc if d[1] <= 0]
-			if len(dist_uc_neg) >= stepsize // 2 and len(dist_uc_pos) >= stepsize // 2:
-				pos_ids, _ = list(zip(*sorted(dist_uc_pos, key=lambda x: x[1])))
-				neg_ids, _ = list(zip(*sorted(dist_uc_neg, key=lambda x: x[1])))
-				if args.pct_random is not None:
-					active_ids = pos_ids[:(stepsize-random_stepsize) // 2]
-					active_ids +=  neg_ids[:(stepsize-random_stepsize) // 2]
-					to_code.extend(active_ids)
-					to_code.extend(get_random(list(set(unlabeled_ids) - set(active_ids)), (stepsize - len(active_ids))))
-				else:
-					to_code.extend(pos_ids[:stepsize // 2])
-					to_code.extend(neg_ids[:stepsize // 2])
-			else:
-				print("Not enough observations on each side of hyperplane.")
-				dist_to_hp = abs(dist_to_hp)
-				dist_uc = list(zip(unlabeled_ids, dist_to_hp))
-				dist_uc = sorted(dist_uc, key=lambda x: x[1])
-				sorted_ids = list(zip(*dist_uc))[0]
-				if args.pct_random is not None:
-					active_ids = sorted_ids[:(stepsize-random_stepsize)]
-					to_code.extend(active_ids)
-					to_code.extend(get_random(list(set(unlabeled_ids) - set(active_ids)), (stepsize - len(active_ids))))
-				else:
-					to_code.extend(sorted_ids[:stepsize])
-			'''
 		elif args.query_strat == 'committee':
 			sorted_entropies = list(zip(unlabeled_ids, entropies))
 			sorted_entropies = sorted(sorted_entropies, key=lambda x: x[1], reverse=True)
