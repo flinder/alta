@@ -1,10 +1,15 @@
-library(tidyverse)
-library(assertthat)
+#devtools::install_github('tidyverse/dplyr')
+library(dplyr) # Note that this is currently the development version which 
+               # contains a new feature to keep empty groups in 
+               # group_by() - summarize() operations (used for the results table)
+library(ggplot2)
+library(tidyr)
 #devtools::install_github('flinder/flindR')
 library(flindR)
 library(reshape2)
 library(yaml)
 library(stringr)
+library(xtable)
 
 # ==============================================================================
 # CONFIG
@@ -55,36 +60,36 @@ proc_file = function(filename, data_set) {
 # TODO: If results for different query algorithms come in separate files, this 
 # code has to be adapted to put them all in the same DF. Adjust algo in 
 # proc_file() accordingly
-results = list()
-i = 1
-for(data_set in DATA_SETS) {
-    
-    cat('Processing ', data_set, '\n')    
-    
-    inpath = paste0(DATA_DIR, data_set) 
-    files = list.files(inpath, recursive = TRUE, pattern = '\\d.csv$')
-    files = paste0(inpath, '/', files)
-    
-    dfs = lapply(files, proc_file, data_set) 
-    data = do.call(rbind, dfs) %>%
-        mutate(f1_kcore = ifelse(is.na(f1), 0, f1),
-               precision = ifelse(is.na(p), 0, p),
-               recall = ifelse(is.na(r), 0, r),
-               balance = paste0("Balance: ", balance),
-               data_set = data_set)
-    results[[i]] = data
-    i = i + 1
-}   
+#results = list()
+#i = 1
+#for(data_set in DATA_SETS) {
+#    
+#    cat('Processing ', data_set, '\n')    
+#    
+#    inpath = paste0(DATA_DIR, data_set) 
+#    files = list.files(inpath, recursive = TRUE, pattern = '\\d.csv$')
+#    files = paste0(inpath, '/', files)
+#    
+#    dfs = lapply(files, proc_file, data_set) 
+#    data = do.call(rbind, dfs) %>%
+#        mutate(f1_kcore = ifelse(is.na(f1), 0, f1),
+#               precision = ifelse(is.na(p), 0, p),
+#               recall = ifelse(is.na(r), 0, r),
+#               balance = paste0("Balance: ", balance),
+#               data_set = data_set)
+#    results[[i]] = data
+#    i = i + 1
+#}   
 #save(results, file = 'results_cache.RData')
 
-#load('results_cache.RData')
+load('results_cache.RData')
 data = do.call(rbind, results)
 data$data_set = recode(data$data_set, 'tweets' = 'Twitter', 
                       'wikipedia_hate_speech' = 'Wikipedia',
                       'breitbart' = 'Breitbart')
 icr_data = filter(data, !is.na(icr))
-data = filter(data, balance %in% c("Balance: 0.01", "Balance: 0.1", 
-                                   "Balance: 0.3", "Balance: 0.5"))
+data = filter(data, balance %in% c("Balance: 0.01", "Balance: 0.05", 
+                                   "Balance: 0.1", "Balance: 0.5"))
 
 n_dset = length(unique(data$data_set))
 
@@ -96,7 +101,8 @@ data = filter(data, is.na(icr)) %>% select(-icr)
 # ==============================================================================
 
 # F1 score
-data = filter(data, batch * BATCH_SIZE <= 4000)
+data = filter(data, !(batch * BATCH_SIZE > 5000 & data_set == 'Breitbart'& 
+                      balance == "Balance: 0.01"))
 ggplot(data, aes(x = batch * BATCH_SIZE #/ total_samples * 100
                  , y = f1, 
                  color = algo, linetype = algo)) +
@@ -110,11 +116,61 @@ ggplot(data, aes(x = batch * BATCH_SIZE #/ total_samples * 100
     #xlab('% of samples labeled') +
     plot_theme
 ggsave('../paper/figures/main_results_f1.png', width = pe$p_width, 
-       height = htwr*pe$p_width)
+       height = htwr*pe$p_width, dpi = 100)
 ggsave('../presentation/figures/main_results_f1.png', width = pe$p_width, 
-       height = htwr_pres*pe$p_width)
+       height = htwr_pres*pe$p_width, dpi = 100)
 
-# Precision
+# Table: Average amount of training data required to reach levels of f1 score
+empty_robust_ci = function(x) {
+    out = try(t.test(x), silent = TRUE)
+    if(inherits(out, 'try-error')) {
+        return(c(NA, NA))
+    } else {
+        return(out$conf.int)
+    }
+}
+
+# Make table to interpret the ratio of required training data
+data %>% 
+    na.omit() %>%
+    mutate(n_training_samples = batch * BATCH_SIZE) %>%
+    select(run, batch, n_training_samples, f1, algo, data_set, balance) %>%
+    group_by(run, algo, data_set, balance) %>%
+    mutate(first_01 = cumsum(cumsum(f1 >= 0.1)) == 1,
+           first_05 = cumsum(cumsum(f1 >= 0.5)) == 1,
+           first_08 = cumsum(cumsum(f1 >= 0.8)) == 1) %>%
+    melt(id.vars = c('run', 'batch', 'n_training_samples', 'f1', 'algo',
+                     'data_set', 'balance')) %>%
+    tbl_df() %>%
+    mutate(value = factor(value, levels = c('TRUE', 'FALSE'))) %>%
+    group_by(algo, variable, value, data_set, balance) %>%
+    summarize(average_td = mean(n_training_samples)#,
+              #ci_td_lo = empty_robust_ci(n_training_samples)[1],
+              #ci_td_hi = empty_robust_ci(n_training_samples)[2],
+              #n_reached = n()
+              ) %>%
+    ungroup() %>%
+    filter(value == 'TRUE') %>%
+    select(-value) %>%
+    spread(algo, average_td) %>% 
+    mutate(ratio = random / active,
+           f1_score = as.numeric(sapply(strsplit(as.character(variable), '_'), 
+                                        function(x) x[2])) / 10,
+           balance = as.numeric(sapply(strsplit(balance, ' '), 
+                                       function(x) x[2]))) %>%
+    select(-variable) %>%
+    arrange(data_set, balance) %>%
+    filter(f1_score == 0.1) %>%
+    rename('Data Set' = data_set, 'Balance' = balance, 
+           '# Samples Active' = active, '# Samples Passive' = random,
+           'Ratio' = ratio) %>%
+    select(-f1_score) %>%
+    xtable(caption = 'Number of training samples required to reach an F1-Score of 0.1 for active and passive learning.',
+           label = 'tab:n_train_samples') %>%
+    print(file = '../paper/tables/n_train_samples.tex', 
+          include.rownames = FALSE)
+
+    # Precision
 ggplot(data, aes(x = batch * BATCH_SIZE #/ total_samples * 100
                  , 
                  y = precision, color = algo, linetype = algo)) +
@@ -126,9 +182,9 @@ ggplot(data, aes(x = batch * BATCH_SIZE #/ total_samples * 100
     ylab('Precision') + xlab('# labeled samples') +
     plot_theme
 ggsave('../paper/figures/main_results_precision.png', width = pe$p_width, 
-       height = htwr*pe$p_width)
+       height = htwr*pe$p_width, dpi = 100)
 ggsave('../presentation/figures/main_results_precision.png', 
-       width = pe$p_width, height = htwr_pres*pe$p_width)
+       width = pe$p_width, height = htwr_pres*pe$p_width, dpi = 100)
 
 # Recall
 ggplot(data, aes(x = batch * BATCH_SIZE #/ total_samples * 100
@@ -142,9 +198,9 @@ ggplot(data, aes(x = batch * BATCH_SIZE #/ total_samples * 100
     ylab('Recall') + xlab('# labeled samples') +
     plot_theme
 ggsave('../paper/figures/main_results_recall.png', 
-       width = pe$p_width, height = htwr*pe$p_width)
+       width = pe$p_width, height = htwr*pe$p_width, dpi = 100)
 ggsave('../presentation/figures/main_results_recall.png', 
-       width = pe$p_width, height = htwr_pres*pe$p_width)
+       width = pe$p_width, height = htwr_pres*pe$p_width, dpi = 100)
 
 # Visualize support growth
 data = do.call(rbind, results)
@@ -168,9 +224,9 @@ ggplot(filter(d, (batch * BATCH_SIZE) < 5000),
     ylab('F1-Score (mean)') + xlab('# labeled samples') +
     plot_theme
 ggsave('../paper/figures/f1_labeled_support_balance_001.png', 
-       width = pe$p_width, height = 0.7*pe$p_width)
+       width = pe$p_width, height = 0.7*pe$p_width, dpi = 100)
 ggsave('../presentation/figures/f1_labeled_support_balance_001.png', 
-   width = pe$p_width, height = 0.7*pe$p_width)
+   width = pe$p_width, height = 0.7*pe$p_width, dpi = 100)
 
 
 # ==============================================================================
@@ -348,9 +404,9 @@ ggplot(icr_data, aes(x = batch * BATCH_SIZE, y = f1, color = algo,
     ylab('F1 Score') + xlab('# labeled samples') +
     plot_theme
 ggsave('../paper/figures/icr_results_f1.png', width = 1.3 * pe$p_width, 
-       height = htwr*pe$p_width)
+       height = 0.8 * htwr*pe$p_width)
 ggsave('../presentation/figures/icr_results_f1.png', width = 1.3 * pe$p_width, 
-       height = htwr_pres*pe$p_width)
+       height = 0.8 * htwr_pres*pe$p_width)
 
 # ==============================================================================
 # Plots exclusively for presentation
