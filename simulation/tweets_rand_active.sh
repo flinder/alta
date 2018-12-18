@@ -1,9 +1,9 @@
 #!/bin/bash
-for i in {30..49};
+for i in {10..49};
 do
 	for BALANCE in .01 .05 .1; 
     do
-    	for PCTRAND in 0.0 .25 .5 .75;
+    	for PCTRAND in 0.0 0.25 0.75;
     	do
         	echo Bal: $BALANCE, Iter: $i, Pct Rand: $PCTRAND
 			python3 active_learning_sim.py tweets\
