@@ -1,4 +1,5 @@
 import argparse
+import copy
 import glob
 import itertools
 import pandas as pd
@@ -12,6 +13,7 @@ from scipy.stats import expon, beta, rv_continuous
 from datetime import datetime 
 from collections import Counter
 from functools import reduce
+from multiprocessing import Pool
 from operator import or_
 
 def merge(*dicts):
@@ -217,19 +219,13 @@ def entropy(votes):
 	neg = (n_neg/C) * np.log(n_neg/C)
 	return(-(pos + neg))
 
-sgd_params = {
-	'clf__alpha': (0.00001, 0.000001),
-	'clf__penalty': ('l2', 'elasticnet'),
-	'clf__max_iter': (5, 10, 50, 80),
-	'text__selector__fname': text_feature_sets
-}
 
 sgd_pipeline = Pipeline([
 		('text', Pipeline([
 			('selector', DtmSelector(fname=text_feature_sets[0])),
 			('tfidf', TfidfTransformer())
 		])),
-		('clf', SGDClassifier()),
+		('clf', SGDClassifier(penalty='l2', max_iter=80, alpha=1e-06)),
 ])
 
 if config['data_sets'][args.data]['sgd'] == True:
@@ -443,26 +439,21 @@ for i in range(n_steps):
 			else:
 				to_code.extend(sorted_ids[:stepsize])
 		elif args.query_strat == 'emc':
-			sgd_grid = RandomizedSearchCV(
-							sgd_pipeline,
-							sgd_params,
-							n_iter=5,
-							scoring=make_scorer(f1_score),
-							n_jobs=n_jobs
-						)
-			fit = sgd_grid.fit(X_train, y_train)
-			params = fit.best_params_
+			fit = sgd_pipeline.fit(X_train, y_train)
 			y_pred_emc = fit.predict(X_pred)
-			scores = []
-			for i, x in enumerate(X_pred):
+			def get_scores(IN):
+				i, x = IN
 				X_cand = np.append(X_train, [x])
 				y_cand = np.append(y_train,y_pred_emc[i])
-				fit_cand = sgd_pipeline.set_params(**params).fit(X_cand, y_cand)
+				sgd = copy.deepcopy(fit)
+				fit_cand = sgd.fit(X_cand, y_cand)
 				y_pred_cand = fit_cand.predict(X_pred)
 				label_change = np.abs(y_pred_cand - y_pred_emc)
 				score = np.sum(label_change)
-				scores.append(score)
-			print(np.max(score))
+				return score
+			with Pool(32) as p:
+				scores = p.map(get_scores, list(enumerate(X_pred)))
+			print(np.max(scores))
 			sorted_scores = list(zip(unlabeled_ids, scores))
 			sorted_scores = sorted(sorted_scores, key=lambda x: x[1], reverse=True)
 			sorted_ids = list(zip(*sorted_scores))[0]

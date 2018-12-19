@@ -1,5 +1,5 @@
 #!/bin/bash
-for i in {10..49};
+for i in {40..49};
 do
 	for BALANCE in .01 .05 .1; 
     do
