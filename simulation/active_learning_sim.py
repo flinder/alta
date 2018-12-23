@@ -442,16 +442,19 @@ for i in range(n_steps):
 			fit = sgd_pipeline.fit(X_train, y_train)
 			y_pred_emc = fit.predict(X_pred)
 			def get_scores(IN):
-				i, x = IN
-				X_cand = np.append(X_train, [x])
-				y_cand = np.append(y_train,y_pred_emc[i])
-				sgd = copy.deepcopy(fit)
-				fit_cand = sgd.fit(X_cand, y_cand)
-				y_pred_cand = fit_cand.predict(X_pred)
-				label_change = np.abs(y_pred_cand - y_pred_emc)
-				score = np.sum(label_change)
-				return score
-			with Pool(32) as p:
+				try:
+					i, x = IN
+					X_cand = np.append(X_train, [x])
+					y_cand = np.append(y_train,y_pred_emc[i])
+					sgd = copy.deepcopy(fit)
+					fit_cand = sgd.fit(X_cand, y_cand)
+					y_pred_cand = fit_cand.predict(X_pred)
+					label_change = np.abs(y_pred_cand - y_pred_emc)
+					score = np.sum(label_change)
+					return score
+				except:
+					return 0
+			with Pool(16) as p:
 				scores = p.map(get_scores, list(enumerate(X_pred)))
 			print(np.max(scores))
 			sorted_scores = list(zip(unlabeled_ids, scores))
