@@ -16,7 +16,6 @@ if __name__ == "__main__":
 
     CONFIG = '../config.yaml'
     DATA_PATH = '../data'
-    MAX_ROWS = 24420
     SEED = 44042
    
     # load config
@@ -38,9 +37,6 @@ if __name__ == "__main__":
         data_set = config['data_sets'][data_set_name]
         df = pd.read_csv(os.path.join(DATA_PATH, data_set['fname']))
         df = df.loc[df[data_set['text_col']].notnull(), ]
-        # Down sample the breitbart and wiki datasets to save computation
-        if data_set_name != 'tweets':
-            df = df.sample(MAX_ROWS, random_state=SEED)
         text = df[data_set['text_col']]
 
         i_feature_sets = enumerate(feature_sets)
