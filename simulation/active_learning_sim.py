@@ -1,4 +1,5 @@
 import argparse
+import copy
 import glob
 import itertools
 import pandas as pd
@@ -9,8 +10,10 @@ import random
 import yaml
 from scipy.stats import expon, beta, rv_continuous
 
+from datetime import datetime 
 from collections import Counter
 from functools import reduce
+from multiprocessing import Pool
 from operator import or_
 
 def merge(*dicts):
@@ -84,7 +87,7 @@ text_feature_sets = list(
 		config["text_features"]["token_type"]
 	)
 )
-text_feature_sets = ['/Users/blakemiller/Box Sync/alta_data/dtms/' + '_'.join([args.data] +
+text_feature_sets = ['../data/dtms/' + '_'.join([args.data] +
 	[str(x) for x in tf]) + '_dtm.pkl'
 	for tf in text_feature_sets]
 
@@ -139,25 +142,25 @@ rand = args.mode
 if args.balance:
 	if args.icr:
 		if args.pct_random is not None:
-			fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_%s_%s_icr_%s_rand_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.balance), str(args.icr), str(args.pct_random))
+			fn = '../data/runs/%s/%s/%s_simulation_data_%s_%s_icr_%s_rand_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.balance), str(args.icr), str(args.pct_random))
 		else:
-			fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_%s_%s_icr_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.balance), str(args.icr))
+			fn = '../data/runs/%s/%s/%s_simulation_data_%s_%s_icr_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.balance), str(args.icr))
 	else:
 		if args.pct_random is not None:
-			fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_%s_%s_rand_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.balance), str(args.pct_random))
+			fn = '../data/runs/%s/%s/%s_simulation_data_%s_%s_rand_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.balance), str(args.pct_random))
 		else:
-			fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_%s_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.balance))
+			fn = '../data/runs/%s/%s/%s_simulation_data_%s_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.balance))
 else:
 	if args.icr:
 		if args.pct_random is not None:
-			fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_%s_icr_%s_rand_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.icr), str(args.pct_random))
+			fn = '../data/runs/%s/%s/%s_simulation_data_%s_icr_%s_rand_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.icr), str(args.pct_random))
 		else:
-			fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_%s_icr_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.icr))
+			fn = '../data/runs/%s/%s/%s_simulation_data_%s_icr_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.icr))
 	else:
 		if args.pct_random is not None:
-			fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_%s_rand_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.pct_random))
+			fn = '../data/runs/%s/%s/%s_simulation_data_%s_rand_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.pct_random))
 		else:
-			fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_%s.csv' % (args.data, str(args.iter), rand, args.query_strat)
+			fn = '../data/runs/%s/%s/%s_simulation_data_%s.csv' % (args.data, str(args.iter), rand, args.query_strat)
 
 if os.path.isfile(fn) or os.path.isfile(fn.replace('.csv','0.csv')):
 	print("Simulation already completed: %s" % fn)
@@ -169,7 +172,7 @@ if os.path.isfile(fn) or os.path.isfile(fn.replace('.csv','0.csv')):
 
 fname = config['data_sets'][args.data]['fname']
 y_col = config['data_sets'][args.data]['y_col']
-data = pd.read_csv("/Users/blakemiller/Box Sync/alta_data/%s" % fname, dtype={y_col: 'int'})
+data = pd.read_csv("../data/%s" % fname, dtype={y_col: 'int'})
 
 if config['data_sets'][args.data]['n_cap'] is not None:
 	data = data.sample(config['data_sets'][args.data]['n_cap'])
@@ -215,6 +218,15 @@ def entropy(votes):
 	pos = (n_pos/C) * np.log(n_pos/C)
 	neg = (n_neg/C) * np.log(n_neg/C)
 	return(-(pos + neg))
+
+
+sgd_pipeline = Pipeline([
+		('text', Pipeline([
+			('selector', DtmSelector(fname=text_feature_sets[0])),
+			('tfidf', TfidfTransformer())
+		])),
+		('clf', SGDClassifier(penalty='l2', max_iter=80, alpha=1e-06)),
+])
 
 if config['data_sets'][args.data]['sgd'] == True:
 	svm = SGDClassifier(loss="hinge", random_state=1988)
@@ -301,6 +313,9 @@ if n_steps < 200:
 labeled_ids = set(random.sample(list(train), 20))
 
 print('beginning steps')
+from datetime import datetime 
+
+start_time = datetime.now() 
 for i in range(n_steps):
 	to_code = []
 
@@ -423,6 +438,29 @@ for i in range(n_steps):
 				to_code.extend(get_random(list(set(unlabeled_ids) - set(active_ids)), (stepsize - len(active_ids))))
 			else:
 				to_code.extend(sorted_ids[:stepsize])
+		elif args.query_strat == 'emc':
+			fit = sgd_pipeline.fit(X_train, y_train)
+			y_pred_emc = fit.predict(X_pred)
+			def get_scores(IN):
+				try:
+					i, x = IN
+					X_cand = np.append(X_train, [x])
+					y_cand = np.append(y_train,y_pred_emc[i])
+					sgd = copy.deepcopy(fit)
+					fit_cand = sgd.fit(X_cand, y_cand)
+					y_pred_cand = fit_cand.predict(X_pred)
+					label_change = np.abs(y_pred_cand - y_pred_emc)
+					score = np.sum(label_change)
+					return score
+				except:
+					return 0
+			with Pool(16) as p:
+				scores = p.map(get_scores, list(enumerate(X_pred)))
+			print(np.max(scores))
+			sorted_scores = list(zip(unlabeled_ids, scores))
+			sorted_scores = sorted(sorted_scores, key=lambda x: x[1], reverse=True)
+			sorted_ids = list(zip(*sorted_scores))[0]
+			to_code.extend(sorted_ids[:stepsize])
 	else:
 		to_code = get_random(unlabeled_ids, stepsize)
 	if len(to_code) > 0:
@@ -432,3 +470,5 @@ for i in range(n_steps):
 
 simulation_data = pd.DataFrame(runs)
 simulation_data.to_csv(fn, index=False)
+time_elapsed = datetime.now() - start_time 
+print('Time elapsed (hh:mm:ss.ms) {}'.format(time_elapsed))

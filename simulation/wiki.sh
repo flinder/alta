@@ -1,20 +1,13 @@
 #!/bin/bash
-for MODE in 'random' 'active'; 
+for i in {0..49};
 do
-    for BALANCE in .01 .05 .1 .5;
+    for BALANCE in .01 .05 .1 .3 .5;
     do
-        for i in {10..15};
+        for Q in 'margin' 'committee';
         do
-            if [ $MODE='random' ];
-            then
-                echo Bal: $BALANCE, Iter: $i, Mode: $MODE
-                python3 active_learning_sim.py wikipedia_hate_speech\
-                    --mode $MODE --iter $i --balance $BALANCE
-            else
-                echo Bal: $BALANCE, Iter: $i, Mode: $MODE
-                python3 active_learning_sim.py wikipedia_hate_speech\
-                    --mode $MODE --iter $i --balance $BALANCE
-            fi
+            echo Bal: $BALANCE, Iter: $i, Query Strat.: $Q
+            python3 active_learning_sim.py wikipedia_hate_speech\
+                    --mode active --iter $i --balance $BALANCE --query_strat $Q
         done
     done
 done
