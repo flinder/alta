@@ -87,7 +87,7 @@ text_feature_sets = list(
 		config["text_features"]["token_type"]
 	)
 )
-text_feature_sets = ['../data/dtms/' + '_'.join([args.data] +
+text_feature_sets = ['/Users/blakemiller/Box Sync/alta_data/dtms/' + '_'.join([args.data] +
 	[str(x) for x in tf]) + '_dtm.pkl'
 	for tf in text_feature_sets]
 
@@ -142,25 +142,25 @@ rand = args.mode
 if args.balance:
 	if args.icr:
 		if args.pct_random is not None:
-			fn = '../data/runs/%s/%s/%s_simulation_data_%s_%s_icr_%s_rand_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.balance), str(args.icr), str(args.pct_random))
+			fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_%s_%s_icr_%s_rand_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.balance), str(args.icr), str(args.pct_random))
 		else:
-			fn = '../data/runs/%s/%s/%s_simulation_data_%s_%s_icr_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.balance), str(args.icr))
+			fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_%s_%s_icr_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.balance), str(args.icr))
 	else:
 		if args.pct_random is not None:
-			fn = '../data/runs/%s/%s/%s_simulation_data_%s_%s_rand_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.balance), str(args.pct_random))
+			fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_%s_%s_rand_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.balance), str(args.pct_random))
 		else:
-			fn = '../data/runs/%s/%s/%s_simulation_data_%s_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.balance))
+			fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_%s_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.balance))
 else:
 	if args.icr:
 		if args.pct_random is not None:
-			fn = '../data/runs/%s/%s/%s_simulation_data_%s_icr_%s_rand_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.icr), str(args.pct_random))
+			fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_%s_icr_%s_rand_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.icr), str(args.pct_random))
 		else:
-			fn = '../data/runs/%s/%s/%s_simulation_data_%s_icr_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.icr))
+			fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_%s_icr_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.icr))
 	else:
 		if args.pct_random is not None:
-			fn = '../data/runs/%s/%s/%s_simulation_data_%s_rand_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.pct_random))
+			fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_%s_rand_%s.csv' % (args.data, str(args.iter), rand, args.query_strat, str(args.pct_random))
 		else:
-			fn = '../data/runs/%s/%s/%s_simulation_data_%s.csv' % (args.data, str(args.iter), rand, args.query_strat)
+			fn = '/Users/blakemiller/Box Sync/alta_data/runs/%s/%s/%s_simulation_data_%s.csv' % (args.data, str(args.iter), rand, args.query_strat)
 
 if os.path.isfile(fn) or os.path.isfile(fn.replace('.csv','0.csv')):
 	print("Simulation already completed: %s" % fn)
@@ -172,7 +172,7 @@ if os.path.isfile(fn) or os.path.isfile(fn.replace('.csv','0.csv')):
 
 fname = config['data_sets'][args.data]['fname']
 y_col = config['data_sets'][args.data]['y_col']
-data = pd.read_csv("../data/%s" % fname, dtype={y_col: 'int'})
+data = pd.read_csv("/Users/blakemiller/Box Sync/alta_data/%s" % fname, dtype={y_col: 'int'})
 
 if config['data_sets'][args.data]['n_cap'] is not None:
 	data = data.sample(config['data_sets'][args.data]['n_cap'])

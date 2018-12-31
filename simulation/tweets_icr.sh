@@ -5,7 +5,7 @@ do
     do
         for BALANCE in .01 .05 .1 .3 .5;
         do
-            for MODE in 'active';
+            for MODE in 'random' 'active'; 
             do
                 echo Bal: $BALANCE, Iter: $i, Mode: $MODE, ICR: $ICR
                 python3 active_learning_sim.py tweets --mode $MODE --query_strat margin --balance $BALANCE --icr $ICR --iter $i
