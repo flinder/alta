@@ -5,7 +5,7 @@ do
     do
         for MODE in 'active'; 
         do
-            for Q in 'margin';
+            for Q in 'committee';
             do
                 echo Bal: $BALANCE, Iter: $i, Mode: $MODE, Query Strat.: $Q
                 python3 active_learning_sim.py breitbart --mode $MODE --query_strat $Q --balance $BALANCE --iter $i
