@@ -33,7 +33,7 @@ data_sets:
             - 'muslim_identity'
         language: 'en'
         y_col: 'muslim_identity'
-        n_jobs: 2
+        n_jobs: 4
         n_cap: null
         sgd: false
         n_docs: 174847
