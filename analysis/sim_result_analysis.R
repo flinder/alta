@@ -3,13 +3,15 @@ library(dplyr) # Note that this is currently the development version which
                # contains a new feature to keep empty groups in 
                # group_by() - summarize() operations (used for the results table)
 library(ggplot2)
-library(tidyr)
 #devtools::install_github('flinder/flindR')
 library(flindR)
 library(reshape2)
 library(yaml)
 library(stringr)
 library(xtable)
+library(tidyr)
+library(readr)
+library(doParallel)
 
 # ==============================================================================
 # CONFIG
@@ -31,86 +33,212 @@ htwr_pres = 0.7
 # ==============================================================================
 # Data prep
 # ==============================================================================
-proc_file = function(filename, data_set) {
-    cat(filename, '\n')
-    comp = unlist(strsplit(filename, '/'))
-    run = as.integer(comp[5])
-    comp_2 = unlist(strsplit(comp[6], '_'))
-    algo = comp_2[1]
-    balance = as.numeric(gsub('\\.csv', '', comp_2[4]))
-    if(is.element('icr', comp_2)) {
-        icr = as.numeric(gsub('\\.csv', '', comp_2[6]))
-    } else {
+
+# This function parses experiment result files (see github readme for filename
+# conventions).
+parse_filename = function(path) {
+    # Get the run idx from the directory name
+    path_components = unlist(strsplit(path, '/'))
+    run = as.integer(path_components[5])
+    data_set = path_components[4]
+    
+    # Parse the experimental conditions from the filename 
+    filename = path_components[6]
+    components = unlist(strsplit(gsub('.csv', '', filename), '_'))
+    
+    ## Check which of the various simulations it is and parse corespondingly
+    # Cols:
+    # - experiment_name
+    # - mode (active/random)
+    # - query_algo
+    # - balance
+    # - icr (NA for non icr experiments)
+    # - prop_random
+    # - )
+    mode = components[1]
+    if(length(components) == 4) {
+        experiment_name = 'main_old'
+        if(mode == 'random') query_algo = ''
+        else query_algo = 'margin'
+        balance = as.numeric(components[4])
         icr = NA
+        prop_random = NA
+    } else if(length(components) == 5) {
+        experiment_name = 'main_new'
+        query_algo = components[4]
+        balance = as.numeric(components[5])
+        icr = NA
+        prop_random = NA
+        if(mode == 'random') {
+            # This is only the case for Breitbart where we had to re-run random
+            # too because the dataset changed
+            query_algo = ''
+        }
+    } else if(length(components) == 6) {
+        experiment_name = 'icr_old'
+        if(mode != 'random') query_algo = 'margin'
+        else query_algo = ''
+        balance = as.numeric(components[4])
+        icr = as.numeric(components[6])
+        prop_random = NA
+    } else if(length(components) == 7) {
+        experiment_name = 'icr_proprand'
+        query_algo = components[4]
+        balance = as.numeric(components[5])
+        if(components[6] == 'icr') {
+            icr = as.numeric(components[7])
+            prop_random = NA
+        } else if(components[6] == 'rand') {
+            icr = NA
+            prop_random = as.numeric(components[7])
+        } else {
+            stop('Unexpected filename structure')
+        }
+    } else {
+        return(list('experiment_name' = NA, 
+                'run' = NA, 
+                'mode' = NA, 
+                'query_algo' = NA, 
+                'balance' = NA, 
+                'icr' = NA, 
+                'prop_random' = NA, 
+                'filename' = filename,
+                'data_set' = NA))
+            
     }
-    # This file is corrupted somehow so I'll skip it 
-    if(filename == '../data/runs/wikipedia_hate_speech/10/random_simulation_data_0.10.csv') {
-        return(NA)
-    }
-    data = suppressMessages(read_csv(filename)) %>%
-        mutate(algo = algo, balance = balance, run = run, icr = icr,
-               total_samples = proj_conf$data_sets[[data_set]]$n_docs)       
-    # TODO: There are inconsistent columns in the breitbart results
-    if("clf__tol" %in% colnames(data)) {
-        data = select(data, -clf__tol)    
-    }
-    return(data)
+    return(list('experiment_name' = experiment_name, 
+                'run' = run, 
+                'mode' = mode, 
+                'query_algo' = query_algo, 
+                'balance' = balance, 
+                'icr' = icr, 
+                'prop_random' = prop_random, 
+                'filename' = filename,
+                'data_set' = data_set))
 }
 
-# TODO: If results for different query algorithms come in separate files, this 
-# code has to be adapted to put them all in the same DF. Adjust algo in 
-# proc_file() accordingly
-#results = list()
-#i = 1
-#for(data_set in DATA_SETS) {
-#    
-#    cat('Processing ', data_set, '\n')    
-#    
-#    inpath = paste0(DATA_DIR, data_set) 
-#    files = list.files(inpath, recursive = TRUE, pattern = '\\d.csv$')
-#    files = paste0(inpath, '/', files)
-#    
-#    dfs = lapply(files, proc_file, data_set) 
-#    data = do.call(rbind, dfs) %>%
-#        mutate(f1_kcore = ifelse(is.na(f1), 0, f1),
-#               precision = ifelse(is.na(p), 0, p),
-#               recall = ifelse(is.na(r), 0, r),
-#               balance = paste0("Balance: ", balance),
-#               data_set = data_set)
-#    results[[i]] = data
-#    i = i + 1
-#}   
-#save(results, file = 'results_cache.RData')
+col_or_na = function(df, col) {
+    if(col %in% colnames(df)) return(as.data.frame(df)[, col])
+    else return(NA)
+}
 
-load('results_cache.RData')
-data = do.call(rbind, results)
+
+# This function extracts metadata from filename, loads the results of the
+# file and returns a standardized dataframe with all information
+# Returned variables:
+# - Experimental metadata (see above)
+# - precision (validation / training)
+# - recall (validation / training)
+# - f1 score (validation / training)
+# - preprocessing string
+# - batch
+# - support
+# - proportion random
+# - balance
+# - algorithm (random, active)
+# - query algorithm
+process_file = function(path) {
+    cat(path, '\n')
+    experiment = parse_filename(path)
+    result_data = try(suppressMessages(read_csv(path)))
+    if(inherits(result_data, 'try-error')) {
+        cat('Error. Skipping.\n') 
+        return(NULL) 
+    } 
+    if(nrow(result_data) == 0) {
+        print('No data')
+        return(NULL) 
+    } 
+    out_data = data_frame(
+        data_set = experiment$data_set,
+        experiment_name = experiment$experiment_name,
+        f1_validation = result_data$f1,
+        precision_validation = result_data$p,
+        recall_validation = result_data$r,
+        f1_training = col_or_na(result_data, 'f1_l'),
+        precision_training = col_or_na(result_data, 'p_l'),
+        recall_training = col_or_na(result_data, 'r_l'),
+        preprocessing_string = result_data$text__selector__fname,
+        batch = result_data$batch,
+        support = result_data$support,
+        balance = experiment$balance,
+        mode = experiment$mode,
+        query_algorithm = experiment$query_algo,
+        run = experiment$run,
+        icr = experiment$icr,
+        prop_random = experiment$prop_random
+        )
+    return(out_data)
+}
+
+
+files = list.files(DATA_DIR, recursive = TRUE, pattern = '\\d.csv$')
+
+# This file causes memory error:
+files = paste0(DATA_DIR, files)
+registerDoParallel(cores=8)
+dfs = foreach(i=1:length(files)) %dopar% process_file(files[i])
+
+data = bind_rows(dfs) %>%
+    filter(!is.na(experiment_name)) %>%
+    mutate(f1_validation = ifelse(is.na(f1_validation), 0, f1_validation),
+           precision_validation = ifelse(is.na(precision_validation), 0, 
+                                         precision_validation),
+           recall_validation = ifelse(is.na(recall_validation), 0, 
+                                      recall_validation),
+           balance = paste0("Balance: ", balance))
+
 data$data_set = recode(data$data_set, 'tweets' = 'Twitter', 
                       'wikipedia_hate_speech' = 'Wikipedia',
                       'breitbart' = 'Breitbart')
-icr_data = filter(data, !is.na(icr))
-data = filter(data, balance %in% c("Balance: 0.01", "Balance: 0.05", 
-                                   "Balance: 0.1", "Balance: 0.5"))
-
-n_dset = length(unique(data$data_set))
-
-# separate out the intercoder reliability runs
-data = filter(data, is.na(icr)) %>% select(-icr)
 
 # ==============================================================================
-# Visualize results
+# Visualize main experiment results
 # ==============================================================================
+
+# Select the following:
+## Twitter: 
+##    - passive learning results (random) from the old experiment
+##    - active learning results (margin) from the icr_proprand experiment wher
+##      proportion random is 0
+##    - active learning results (committee / emc) from the main new experiment
+## Wiki:
+##    - passive learning results (random) from the old experiment
+##    - active learning results (committee / margin ) from new experiment
+## Breitbart
+##    - passive and active learning results (committee / margin) from new exp.
+
+main_pdat = data
+main_pdat$selected = 0
+
+## All results from new experiment. This is also for wiki and breitbart
+main_pdat$selected[main_pdat$experiment_name == 'main_new'] = 1
+# Old random results for Twitter and Wiki
+main_pdat$selected[(main_pdat$data_set %in% c('Twitter', 'Wikipedia') & 
+               main_pdat$mode == 'random' & 
+               main_pdat$experiment_name == 'main_old')] = 1
+# The margin active learning form the icr_proprand experiment (prop_random 0) 
+main_pdat$selected[(main_pdat$data_set == 'Twitter' & 
+               main_pdat$mode == 'active' & 
+               main_pdat$experiment_name == 'icr_proprand' & 
+               main_pdat$prop_random == 0)] = 1
+main_pdat = filter(main_pdat, selected == 1,
+              balance %in% c("Balance: 0.01", "Balance: 0.05", 
+                             "Balance: 0.1", "Balance: 0.5"),
+              (batch + 1) * BATCH_SIZE <= 5000) %>%
+    mutate(algorithm = paste0(mode, '_', query_algorithm))
 
 # F1 score
-data = filter(data, !(batch * BATCH_SIZE > 5000 & data_set == 'Breitbart'& 
-                      balance == "Balance: 0.01"))
-ggplot(data, aes(x = batch * BATCH_SIZE #/ total_samples * 100
-                 , y = f1, 
-                 color = algo, linetype = algo)) +
-    facet_wrap(~balance + data_set, scales = 'free', ncol = n_dset) +
-    geom_point(size = 0.05, alpha = 0.05) + 
-    geom_smooth() +
-    scale_color_manual(values = pe$colors, name = 'Labeling\nAlgorithm') +
+ggplot(main_pdat, aes(x = (batch + 1) * BATCH_SIZE, 
+                 y = f1_validation, 
+                 color = algorithm, 
+                 linetype = algorithm)) +
+    facet_wrap(~balance + data_set, scales = 'free', ncol = 3) +
+    #geom_point(size = 0.05, alpha = 0.05) + 
+    geom_smooth(method = 'loess') +
+    scale_color_manual(values = pe$colors[c(4:1)], name = 'Labeling\nAlgorithm') +
     scale_linetype(name = 'Labeling\nAlgorithm') +
+    ylim(0, 1) +
     ylab('F1 Score') + 
     xlab('# of labeled samples') + 
     #xlab('% of samples labeled') +
@@ -131,28 +259,26 @@ empty_robust_ci = function(x) {
 }
 
 # Make table to interpret the ratio of required training data
-data %>% 
-    na.omit() %>%
-    mutate(n_training_samples = batch * BATCH_SIZE) %>%
-    select(run, batch, n_training_samples, f1, algo, data_set, balance) %>%
-    group_by(run, algo, data_set, balance) %>%
-    mutate(first_01 = cumsum(cumsum(f1 >= 0.1)) == 1,
-           first_05 = cumsum(cumsum(f1 >= 0.5)) == 1,
-           first_08 = cumsum(cumsum(f1 >= 0.8)) == 1) %>%
-    melt(id.vars = c('run', 'batch', 'n_training_samples', 'f1', 'algo',
-                     'data_set', 'balance')) %>%
+main_pdat %>% 
+    filter(query_algorithm %in% c('margin', '')) %>%
+    mutate(n_training_samples = (batch+1) * BATCH_SIZE,
+           algorithm = ifelse(mode == 'random', 'random', 'active')) %>%
+    select(run, batch, n_training_samples, f1_validation, algorithm, 
+           data_set, balance) %>%
+    group_by(run, algorithm, data_set, balance) %>%
+    mutate(first_01 = cumsum(cumsum(f1_validation >= 0.1)) == 1,
+           first_05 = cumsum(cumsum(f1_validation >= 0.5)) == 1,
+           first_08 = cumsum(cumsum(f1_validation >= 0.8)) == 1) %>%
+    melt(id.vars = c('run', 'batch', 'n_training_samples', 'f1_validation', 
+                     'algorithm', 'data_set', 'balance')) %>%
     tbl_df() %>%
     mutate(value = factor(value, levels = c('TRUE', 'FALSE'))) %>%
-    group_by(algo, variable, value, data_set, balance) %>%
-    summarize(average_td = mean(n_training_samples)#,
-              #ci_td_lo = empty_robust_ci(n_training_samples)[1],
-              #ci_td_hi = empty_robust_ci(n_training_samples)[2],
-              #n_reached = n()
-              ) %>%
+    group_by(algorithm, variable, value, data_set, balance) %>%
+    summarize(average_td = mean(n_training_samples)) %>%
     ungroup() %>%
     filter(value == 'TRUE') %>%
-    select(-value) %>%
-    spread(algo, average_td) %>% 
+    select(-value) %>% 
+    spread(algorithm, average_td) %>%
     mutate(ratio = random / active,
            f1_score = as.numeric(sapply(strsplit(as.character(variable), '_'), 
                                         function(x) x[2])) / 10,
@@ -170,16 +296,16 @@ data %>%
     print(file = '../paper/tables/n_train_samples.tex', 
           include.rownames = FALSE)
 
-    # Precision
-ggplot(data, aes(x = batch * BATCH_SIZE #/ total_samples * 100
-                 , 
-                 y = precision, color = algo, linetype = algo)) +
-    facet_wrap(~balance + data_set, scales = 'free', ncol = n_dset) +
-    geom_point(size = 0.05, alpha = 0.05) + 
-    geom_smooth() +
-    scale_color_manual(values = pe$colors, name = 'Labeling\nAlgorithm') +
+# Precision
+ggplot(main_pdat, aes(x = (batch + 1) * BATCH_SIZE, 
+                 y = precision_validation, color = algorithm, 
+                 linetype = algorithm)) +
+    facet_wrap(~balance + data_set, scales = 'free', ncol = 3) +
+    #geom_point(size = 0.05, alpha = 0.05) + 
+    geom_smooth(method = 'loess') +
+    scale_color_manual(values = pe$colors[c(4:1)], name = 'Labeling\nAlgorithm') +
     scale_linetype(name = 'Labeling\nAlgorithm') +
-    ylab('Precision') + xlab('# labeled samples') +
+    ylab('Precision') + xlab('Labeled samples') +
     plot_theme
 ggsave('../paper/figures/main_results_precision.png', width = pe$p_width, 
        height = htwr*pe$p_width, dpi = 100)
@@ -187,15 +313,15 @@ ggsave('../presentation/figures/main_results_precision.png',
        width = pe$p_width, height = htwr_pres*pe$p_width, dpi = 100)
 
 # Recall
-ggplot(data, aes(x = batch * BATCH_SIZE #/ total_samples * 100
-                 , 
-                 y = recall, color = algo, linetype = algo)) +
-    facet_wrap(~balance + data_set, scales = 'free', ncol = n_dset) +
-    geom_point(size = 0.05, alpha = 0.05) + 
-    geom_smooth() +
-    scale_color_manual(values = pe$colors, name = 'Labeling\nAlgorithm') +
+ggplot(main_pdat, aes(x =  (batch + 1) * BATCH_SIZE, 
+                 y = recall_validation, color = algorithm, 
+                 linetype = algorithm)) +
+    facet_wrap(~balance + data_set, scales = 'free', ncol = 3) +
+    #geom_point(size = 0.05, alpha = 0.05) + 
+    geom_smooth(method = 'loess') +
+    scale_color_manual(values = pe$colors[c(4:1)], name = 'Labeling\nAlgorithm') +
     scale_linetype(name = 'Labeling\nAlgorithm') +
-    ylab('Recall') + xlab('# labeled samples') +
+    ylab('Recall') + xlab('Labeled samples') +
     plot_theme
 ggsave('../paper/figures/main_results_recall.png', 
        width = pe$p_width, height = htwr*pe$p_width, dpi = 100)
@@ -203,39 +329,120 @@ ggsave('../presentation/figures/main_results_recall.png',
        width = pe$p_width, height = htwr_pres*pe$p_width, dpi = 100)
 
 # Visualize support growth
-data = do.call(rbind, results)
-data$data_set = recode(data$data_set, 'tweets' = 'Twitter', 
-                      'wikipedia_hate_speech' = 'Wikipedia',
-                      'breitbart' = 'Breitbart')
-d = filter(data, balance == 'Balance: 0.01') %>%
-    group_by(batch, algo, data_set) %>%
-    summarize(mean_f1 = mean(f1_kcore), mean_support = mean(support))
-#total_positives = proj_conf$data_sets$tweets$n_positive
+sg_pdat = filter(main_pdat,
+                 algorithm %in% c('active_margin', 'random_'),
+                 balance == 'Balance: 0.01') %>%
+    group_by(batch, algorithm, data_set) %>%
+    summarize(mean_f1 = mean(f1_validation), 
+              mean_support = mean(support))
 
-ggplot(filter(d, (batch * BATCH_SIZE) < 5000), 
-              aes(x = batch * BATCH_SIZE, 
-              y = mean_f1, color = algo, size = mean_support)) + 
-    facet_wrap(~data_set, ncol = 1) +
+#total_positives = proj_conf$data_sets$tweets$n_positive
+ggplot(sg_pdat, aes(x = (batch + 1) * BATCH_SIZE, y = mean_f1, 
+                    color = algorithm, size = mean_support)) + 
+    facet_wrap(~data_set, ncol = 1, scales = 'free') +
     geom_point(alpha = 0.4) +
     #geom_line(size = 1) +
-    scale_color_manual(values = pe$colors, name = 'Labeling\nAlgorithm') +
+    scale_color_manual(values = pe$colors[c(2,1)], name = 'Labeling\nAlgorithm') +
     scale_linetype(name = 'Labeling\nAlgorithm') +
     scale_size_continuous(name = 'Mean # of\npositives', range = c(0.5, 4)) +
-    ylab('F1-Score (mean)') + xlab('# labeled samples') +
+    ylab('F1-Score (mean)') + xlab('Labeled samples') +
     plot_theme
 ggsave('../paper/figures/f1_labeled_support_balance_001.png', 
        width = pe$p_width, height = 0.7*pe$p_width, dpi = 100)
 ggsave('../presentation/figures/f1_labeled_support_balance_001.png', 
    width = pe$p_width, height = 0.7*pe$p_width, dpi = 100)
 
+# ==============================================================================
+# Intercoder reliability plots
+# ==============================================================================
+icr_data = filter(data, experiment_name %in% c('icr_proprand', 'icr_old'),
+                  balance %in% c("Balance: 0.05", "Balance: 0.1"),
+                  !is.na(icr),
+                  !(experiment_name == 'icr_old' & query_algorithm == 'margin')) %>%
+    mutate(algorithm = paste0(mode, '_', query_algorithm))#,
+           #exper = paste0(algorithm, '_', experiment_name))
+icr_levels = unique(icr_data$icr)
+n_icr = length(icr_levels)
+
+for(l in icr_levels) {
+    icr_data$icr[icr_data$icr == l] = paste0('Reliability: ', l)
+}
+
+ggplot(icr_data, aes(x = (batch + 1) * BATCH_SIZE, y = f1_validation, 
+                     color = algorithm, linetype = algorithm)) +
+    facet_wrap(~balance + icr, scales = 'free', ncol = n_icr) +
+    #geom_point(size = 0.05, alpha = 0.05) +
+    geom_smooth(method = 'loess') +
+    scale_color_manual(values = pe$colors[c(2, 1)], name = 'Labeling\nAlgorithm') +
+    scale_linetype(name = 'Labeling\nAlgorithm') +
+    ylab('F1 Score') + xlab('# labeled samples') +
+    ylim(0, 1) +
+    plot_theme
+ggsave('../paper/figures/icr_results_f1.png', width = 1.3 * pe$p_width, 
+       height = 0.8 * htwr*pe$p_width)
+ggsave('../presentation/figures/icr_results_f1.png', width = 1.3 * pe$p_width, 
+       height = 0.8 * htwr_pres*pe$p_width)
+
+# ==============================================================================
+# Generalization Error Plots
+# ==============================================================================
+
+# For this we compare the training and validation loss 
+ge_pdat = filter(main_pdat,
+                 algorithm == 'active_margin') %>%
+    select(f1_validation, f1_training, data_set, batch, balance, 
+           algorithm) %>%
+    gather(key = 'score_type', value = 'f1_score', -data_set:-algorithm)
+
+ggplot(ge_pdat, aes(x = (batch + 1) * BATCH_SIZE, y = f1_score, 
+                    color = score_type, linetype = score_type)) +
+    geom_smooth(method = 'loess') +
+    facet_wrap(~data_set + balance, scales = 'free') + 
+    scale_color_manual(values = pe$colors[c(6, 7)], 
+                       name = 'Score\nType', 
+                       labels = c('Training', 'Validation')) + 
+    scale_linetype_manual(values = c(1, 2), 
+                          name = 'Score\nType',
+                          labels = c('Training', 'Validation')) + 
+    ylim(0, 1) +
+    ylab('F1 Score') + xlab('Labeled samples') +
+    pe$theme
+ggsave('../paper/figures/generalization_error.png', width = pe$p_width, 
+       height = htwr*pe$p_width, dpi = 100)
+
+# ==============================================================================
+# Proportion Random
+# ==============================================================================
+
+pr_pdat = filter(data, experiment_name == 'icr_proprand',
+                 !is.na(prop_random),
+                 balance %in% c("Balance: 0.01", "Balance: 0.05", 
+                                "Balance: 0.1", "Balance: 0.5"),
+                 prop_random != 0.2) %>%
+    mutate(prop_random = as.factor(prop_random))
+
+ggplot(pr_pdat, aes(x = (batch + 1) * BATCH_SIZE, y = f1_validation, color = prop_random,
+           linetype = prop_random)) +
+    #geom_point(size = 0.5, alpha = 0.1) +
+    facet_wrap(~balance, scales = 'free') +
+    geom_smooth(method = 'loess') +
+    scale_color_manual(values = pe$colors, 
+                       name = 'Proportion\nRandom') + 
+    scale_linetype_manual(values = 1:4, 
+                          name = 'Proportion\nRandom') + 
+    ylab('F1 Score') + xlab('Labeled samples') +
+    ylim(0, 1) +
+    pe$theme
+ggsave('../paper/figures/proportion_random.png', width = pe$p_width, 
+       height = htwr*pe$p_width, dpi = 100)
 
 # ==============================================================================
 # Pre-pocessing choices
 # ==============================================================================
 
 # Parse out all preprocessing options from text selector argument    
-pp_dat = filter(data, !is.na(text__selector__fname))
-pp_info = pp_dat$text__selector__fname
+pp_dat = filter(data, !is.na(preprocessing_string))
+pp_info = pp_dat$preprocessing_string
 pp_dat$token_type = gsub("'", '', str_extract(pp_info, "'.+'"))
 pp_dat$gram_size = as.integer(gsub("'", '', str_extract(pp_info, "\\d")))
 weight_stem_info = str_extract(pp_info, '(True|False)_(True|False)')
@@ -244,7 +451,7 @@ pp_dat$tfidf = tfidf_str == 'True'
 stem_str = sapply(weight_stem_info, function(x) unlist(strsplit(x, '_'))[2])  
 pp_dat$stem = stem_str == 'True'
     
-pp_dat = select(pp_dat, -text__selector__fname)  
+pp_dat = select(pp_dat, -preprocessing_string)  
 
 ## Tfidf
 ## +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -321,92 +528,6 @@ ggsave('../paper/figures/preproc_gram_size.png',
        width = pe$p_width, height = 0.7*pe$p_width)
 ggsave('../presentation/figures/preproc_gram_size.png', 
        width = pe$p_width, height = 0.7*pe$p_width)
-
-# ==============================================================================
-# Relationship of f1-score and pre-processing choices
-# ==============================================================================
-
-## Token Type
-ggplot(pp_dat) + 
-    geom_boxplot(aes(x = data_set, y = f1, fill = token_type), 
-                 alpha = 0.8, outlier.size = 0.1) +
-    stat_summary(aes(x = data_set, y = f1, group = token_type), 
-                 fun.y = mean, geom = 'point', shape = 3,
-                 position = position_dodge(width = 0.75)) +
-    scale_fill_manual(values = pe$colors, name = 'Token\nType',
-                      labels = c('Character', 'Word')) +
-    scale_color_manual(values = pe$colors, name = 'Token\nType',
-                       labels = c('Character', 'Word')) +
-    scale_x_discrete(labels = c('Twitter', 'Wikipedia')) +
-    ylab('F1 Score') + xlab('') +
-    plot_theme
-ggsave('../paper/figures/preproc_f1_token_type.png', 
-       width = pe$p_width, height = 0.7*pe$p_width)
-ggsave('../presentation/figures/preproc_f1_token_type.png', 
-       width = pe$p_width, height = 0.7*pe$p_width)
-
-## Tfidf
-ggplot(pp_dat) + 
-    geom_boxplot(aes(x = data_set, y = f1, fill = tfidf), 
-                 alpha = 0.8, outlier.size = 0.1) +
-    stat_summary(aes(x = data_set, y = f1, group = tfidf), 
-                 fun.y = mean, geom = 'point', shape = 3,
-                 position = position_dodge(width = 0.75)) +
-    scale_fill_manual(values = pe$colors, name = 'Token\nWeight',
-                      labels = c('Count', 'Tfidf')) +
-    scale_color_manual(values = pe$colors, name = 'Token\nWeight',
-                       labels = c('Count', 'Tfidf')) +
-    scale_x_discrete(labels = c('Twitter', 'Wikipedia')) +
-    ylab('F1 Score') + xlab('') +
-    plot_theme
-ggsave('../paper/figures/preproc_f1_tfidf.png', 
-       width = pe$p_width, height = 0.7*pe$p_width)
-ggsave('../presentation/figures/preproc_f1_tfidf.png', 
-       width = pe$p_width, height = 0.7*pe$p_width)
-
-## Stemm/Lemma
-ggplot(pp_dat) + 
-    geom_boxplot(aes(x = data_set, y = f1, fill = stem), 
-                 alpha = 0.8, outlier.size = 0.1) +
-    stat_summary(aes(x = data_set, y = f1, group = stem), 
-                 fun.y = mean, geom = 'point', shape = 3,
-                 position = position_dodge(width = 0.75)) +
-    scale_fill_manual(values = pe$colors, name = 'Normalize',
-                      labels = c('Lemmatize', 'Stem')) +
-    scale_color_manual(values = pe$colors, name = 'Normalize',
-                       labels = c('Lemmatize', 'Stem')) +
-    scale_x_discrete(labels = c('Twitter', 'Wikipedia')) +
-    ylab('F1 Score') + xlab('') +
-    plot_theme
-ggsave('../paper/figures/preproc_f1_stem.png', 
-       width = pe$p_width, height = 0.7*pe$p_width)
-ggsave('../presentation/figures/preproc_f1_stem.png', 
-       width = pe$p_width, height = 0.7*pe$p_width)
-
-# ==============================================================================
-# Intercoder reliability plots
-# ==============================================================================
-icr_data = filter(icr_data, balance %in% c("Balance: 0.05", "Balance: 0.1"))
-icr_levels = unique(icr_data$icr)
-n_icr = length(icr_levels)
-
-for(l in icr_levels) {
-    icr_data$icr[icr_data$icr == l] = paste0('Reliability: ', l)
-}
-
-ggplot(icr_data, aes(x = batch * BATCH_SIZE, y = f1, color = algo,
-                 linetype = algo)) +
-    facet_wrap(~balance + icr, scales = 'free', ncol = n_icr) +
-    geom_point(size = 0.05, alpha = 0.05) +
-    geom_smooth() +
-    scale_color_manual(values = pe$colors, name = 'Labeling\nAlgorithm') +
-    scale_linetype(name = 'Labeling\nAlgorithm') +
-    ylab('F1 Score') + xlab('# labeled samples') +
-    plot_theme
-ggsave('../paper/figures/icr_results_f1.png', width = 1.3 * pe$p_width, 
-       height = 0.8 * htwr*pe$p_width)
-ggsave('../presentation/figures/icr_results_f1.png', width = 1.3 * pe$p_width, 
-       height = 0.8 * htwr_pres*pe$p_width)
 
 # ==============================================================================
 # Plots exclusively for presentation
