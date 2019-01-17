@@ -5,9 +5,12 @@ do
     do
         for Q in 'margin' 'committee';
         do
-            echo Bal: $BALANCE, Iter: $i, Query Strat.: $Q
-            python3 active_learning_sim.py wikipedia_hate_speech\
-                    --mode active --iter $i --balance $BALANCE --query_strat $Q
+            for MODE in 'random' 'active'; 
+            do
+                echo Bal: $BALANCE, Iter: $i, Query Strat.: $Q
+                python3 active_learning_sim.py wikipedia_hate_speech\
+                        --mode $MODE --iter $i --balance $BALANCE --query_strat $Q
+            done
         done
     done
 done
