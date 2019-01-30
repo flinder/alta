@@ -227,8 +227,13 @@ main_pdat$selected[(main_pdat$data_set == 'Twitter' &
 main_pdat = filter(main_pdat, selected == 1,
               balance %in% c("Balance: 0.01", "Balance: 0.05", 
                              "Balance: 0.1", "Balance: 0.5"),
-              (batch + 1) * BATCH_SIZE <= 5000) %>%
-    mutate(algorithm = paste0(mode, '_', query_algorithm))
+              (batch + 1) * BATCH_SIZE <= 5000)
+main_pdat$algorithm = NA
+main_pdat$algorithm[main_pdat$query_algorithm == "committee"] = 'Query by\nCommittee'
+main_pdat$algorithm[main_pdat$query_algorithm == "margin"] = 'Margin Sampling'
+main_pdat$algorithm[main_pdat$query_algorithm == ""] = 'Random'
+main_pdat$algorithm[main_pdat$query_algorithm == "emc"] = 'Expected Model\nChange'
+
 
 # F1 score
 ggplot(main_pdat, aes(x = (batch + 1) * BATCH_SIZE, 
@@ -441,11 +446,11 @@ ggplot(ge_pdat, aes(x = (batch + 1) * BATCH_SIZE, y = 1-f1_score,
     #facet_wrap(~balance + data_set, scales = 'free', ncol = 3) + 
     facet_wrap(~balance, scales = 'free', ncol = 3) + 
     scale_color_manual(values = pe$colors[c(6, 7)], 
-                       name = 'Score\nType', 
-                       labels = c('Training', 'Validation')) + 
+                       name = '', 
+                       labels = c('Cross-Validation\nError', 'Test Set Error')) + 
     scale_linetype_manual(values = c(1, 2), 
-                          name = 'Score\nType',
-                          labels = c('Training', 'Validation')) + 
+                          name = '',
+                          labels = c('Cross-Validation\nError', 'Test Set Error')) + 
     ylim(0, 1) +
     ylab('1 - F1 Score') + xlab('Labeled samples') +
     plot_theme
