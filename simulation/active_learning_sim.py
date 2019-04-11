@@ -430,7 +430,6 @@ for i in range(n_steps):
 				to_code.extend(sorted_ids[:stepsize])
 		elif args.query_strat == 'committee':
 			sorted_entropies = list(zip(unlabeled_ids, entropies))
-			random.shuffle(sorted_entropies)
 			sorted_entropies = sorted(sorted_entropies, key=lambda x: x[1], reverse=True)
 			sorted_ids = list(zip(*sorted_entropies))[0]
 			if args.pct_random is not None:
