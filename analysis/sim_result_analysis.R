@@ -187,6 +187,8 @@ data = bind_rows(dfs) %>%
            recall_validation = ifelse(is.na(recall_validation), 0, 
                                       recall_validation),
            balance = paste0("Balance: ", balance))
+# Remove the zeros
+#data = filter(data, f1_validation != 0)
 
 data$data_set = recode(data$data_set, 'tweets' = 'Twitter', 
                       'wikipedia_hate_speech' = 'Wikipedia',
@@ -225,8 +227,13 @@ main_pdat$selected[(main_pdat$data_set == 'Twitter' &
 main_pdat = filter(main_pdat, selected == 1,
               balance %in% c("Balance: 0.01", "Balance: 0.05", 
                              "Balance: 0.1", "Balance: 0.5"),
-              (batch + 1) * BATCH_SIZE <= 5000) %>%
-    mutate(algorithm = paste0(mode, '_', query_algorithm))
+              (batch + 1) * BATCH_SIZE <= 5000)
+main_pdat$algorithm = NA
+main_pdat$algorithm[main_pdat$query_algorithm == "committee"] = 'Query by\nCommittee'
+main_pdat$algorithm[main_pdat$query_algorithm == "margin"] = 'Margin Sampling'
+main_pdat$algorithm[main_pdat$query_algorithm == ""] = 'Random'
+main_pdat$algorithm[main_pdat$query_algorithm == "emc"] = 'Expected Model\nChange'
+
 
 # F1 score
 ggplot(main_pdat, aes(x = (batch + 1) * BATCH_SIZE, 
@@ -236,6 +243,7 @@ ggplot(main_pdat, aes(x = (batch + 1) * BATCH_SIZE,
     facet_wrap(~balance + data_set, scales = 'free', ncol = 3) +
     #geom_point(size = 0.05, alpha = 0.05) + 
     geom_smooth(method = 'loess') +
+    #geom_smooth() +
     scale_color_manual(values = pe$colors[c(4:1)], name = 'Labeling\nAlgorithm') +
     scale_linetype(name = 'Labeling\nAlgorithm') +
     ylim(0, 1) +
@@ -303,6 +311,7 @@ ggplot(main_pdat, aes(x = (batch + 1) * BATCH_SIZE,
     facet_wrap(~balance + data_set, scales = 'free', ncol = 3) +
     #geom_point(size = 0.05, alpha = 0.05) + 
     geom_smooth(method = 'loess') +
+    #geom_smooth() +
     scale_color_manual(values = pe$colors[c(4:1)], name = 'Labeling\nAlgorithm') +
     scale_linetype(name = 'Labeling\nAlgorithm') +
     ylab('Precision') + xlab('Labeled samples') +
@@ -319,6 +328,7 @@ ggplot(main_pdat, aes(x =  (batch + 1) * BATCH_SIZE,
     facet_wrap(~balance + data_set, scales = 'free', ncol = 3) +
     #geom_point(size = 0.05, alpha = 0.05) + 
     geom_smooth(method = 'loess') +
+    #geom_smooth() +
     scale_color_manual(values = pe$colors[c(4:1)], name = 'Labeling\nAlgorithm') +
     scale_linetype(name = 'Labeling\nAlgorithm') +
     ylab('Recall') + xlab('Labeled samples') +
@@ -358,7 +368,8 @@ ggsave('../presentation/figures/f1_labeled_support_balance_001.png',
 icr_data = filter(data, experiment_name %in% c('icr_proprand', 'icr_old'),
                   balance %in% c("Balance: 0.05", "Balance: 0.1"),
                   !is.na(icr),
-                  !(experiment_name == 'icr_old' & query_algorithm == 'margin')) %>%
+                  !(experiment_name == 'icr_old' & query_algorithm == 'margin'),
+                  icr != 0.85) %>%
     mutate(algorithm = paste0(mode, '_', query_algorithm))#,
            #exper = paste0(algorithm, '_', experiment_name))
 icr_levels = unique(icr_data$icr)
@@ -368,20 +379,54 @@ for(l in icr_levels) {
     icr_data$icr[icr_data$icr == l] = paste0('Reliability: ', l)
 }
 
-ggplot(icr_data, aes(x = (batch + 1) * BATCH_SIZE, y = f1_validation, 
+p = ggplot(icr_data, aes(x = (batch + 1) * BATCH_SIZE, y = f1_validation, 
                      color = algorithm, linetype = algorithm)) +
     facet_wrap(~balance + icr, scales = 'free', ncol = n_icr) +
     #geom_point(size = 0.05, alpha = 0.05) +
     geom_smooth(method = 'loess') +
-    scale_color_manual(values = pe$colors[c(2, 1)], name = 'Labeling\nAlgorithm') +
+    #geom_smooth() +
+    scale_color_manual(values = pe$colors[c(4, 2, 1)], 
+                       name = 'Labeling\nAlgorithm') +
     scale_linetype(name = 'Labeling\nAlgorithm') +
-    ylab('F1 Score') + xlab('# labeled samples') +
+    ylab('F1 Score') + xlab('Labeled samples') +
     ylim(0, 1) +
     plot_theme
-ggsave('../paper/figures/icr_results_f1.png', width = 1.3 * pe$p_width, 
+ggsave('../paper/figures/icr_results_f1.png', p, width = 1.3 * pe$p_width, 
        height = 0.8 * htwr*pe$p_width)
-ggsave('../presentation/figures/icr_results_f1.png', width = 1.3 * pe$p_width, 
+ggsave('../presentation/figures/icr_results_f1.png', p, width = 1.3 * pe$p_width, 
        height = 0.8 * htwr_pres*pe$p_width)
+
+
+p = ggplot(icr_data, aes(x = (batch + 1) * BATCH_SIZE, y = recall_validation, 
+                     color = algorithm, linetype = algorithm)) +
+    facet_wrap(~balance + icr, scales = 'free', ncol = n_icr) +
+    #geom_point(size = 0.05, alpha = 0.05) +
+    geom_smooth(method = 'loess') +
+    #geom_smooth() +
+    scale_color_manual(values = pe$colors[c(4, 2, 1)], 
+                       name = 'Labeling\nAlgorithm') +
+    scale_linetype(name = 'Labeling\nAlgorithm') +
+    ylab('Recall') + xlab('Labeled samples') +
+    ylim(0, 1) +
+    plot_theme
+ggsave('../paper/figures/icr_results_recall.png', p, width = 1.3 * pe$p_width, 
+       height = 0.8 * htwr*pe$p_width)
+
+
+p = ggplot(icr_data, aes(x = (batch + 1) * BATCH_SIZE, y = precision_validation, 
+                     color = algorithm, linetype = algorithm)) +
+    facet_wrap(~balance + icr, scales = 'free', ncol = n_icr) +
+    #geom_point(size = 0.05, alpha = 0.05) +
+    geom_smooth(method = 'loess') +
+    #geom_smooth() +
+    scale_color_manual(values = pe$colors[c(4, 2, 1)], 
+                       name = 'Labeling\nAlgorithm') +
+    scale_linetype(name = 'Labeling\nAlgorithm') +
+    ylab('Precision') + xlab('Labeled samples') +
+    ylim(0, 1) +
+    plot_theme
+ggsave('../paper/figures/icr_results_precision.png', p, width = 1.3 * pe$p_width, 
+       height = 0.8 * htwr*pe$p_width)
 
 # ==============================================================================
 # Generalization Error Plots
@@ -394,19 +439,21 @@ ge_pdat = filter(main_pdat,
            algorithm) %>%
     gather(key = 'score_type', value = 'f1_score', -data_set:-algorithm)
 
-ggplot(ge_pdat, aes(x = (batch + 1) * BATCH_SIZE, y = f1_score, 
+ggplot(ge_pdat, aes(x = (batch + 1) * BATCH_SIZE, y = 1-f1_score, 
                     color = score_type, linetype = score_type)) +
-    geom_smooth(method = 'loess') +
-    facet_wrap(~data_set + balance, scales = 'free') + 
+    #geom_smooth(method = 'loess') +
+    geom_smooth() +
+    #facet_wrap(~balance + data_set, scales = 'free', ncol = 3) + 
+    facet_wrap(~balance, scales = 'free', ncol = 3) + 
     scale_color_manual(values = pe$colors[c(6, 7)], 
-                       name = 'Score\nType', 
-                       labels = c('Training', 'Validation')) + 
+                       name = '', 
+                       labels = c('Cross-Validation\nError', 'Test Set Error')) + 
     scale_linetype_manual(values = c(1, 2), 
-                          name = 'Score\nType',
-                          labels = c('Training', 'Validation')) + 
+                          name = '',
+                          labels = c('Cross-Validation\nError', 'Test Set Error')) + 
     ylim(0, 1) +
-    ylab('F1 Score') + xlab('Labeled samples') +
-    pe$theme
+    ylab('1 - F1 Score') + xlab('Labeled samples') +
+    plot_theme
 ggsave('../paper/figures/generalization_error.png', width = pe$p_width, 
        height = htwr*pe$p_width, dpi = 100)
 
@@ -426,6 +473,7 @@ ggplot(pr_pdat, aes(x = (batch + 1) * BATCH_SIZE, y = f1_validation, color = pro
     #geom_point(size = 0.5, alpha = 0.1) +
     facet_wrap(~balance, scales = 'free') +
     geom_smooth(method = 'loess') +
+    #geom_smooth() +
     scale_color_manual(values = pe$colors, 
                        name = 'Proportion\nRandom') + 
     scale_linetype_manual(values = 1:4, 
